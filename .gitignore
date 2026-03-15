@@ -1,0 +1,28 @@
+# ── Environment ───────────────────────────────
+.env
+.env.local
+*.log
+
+# ── Python / Django ───────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+db.sqlite3
+backend/media/
+media/
+
+# ── Node / Frontend ──────────────────────────
+node_modules/
+frontend/dist/
+dist/
+
+# ── IDE ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────
+.DS_Store
+Thumbs.db
