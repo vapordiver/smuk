@@ -1,0 +1,1287 @@
+openapi: "3.0.3"
+
+info:
+  title: SMUK API — System Monitorowania Usterek Kampusu
+  version: "1.1.0"
+  description: |
+    REST API dla systemu zgłaszania i zarządzania usterkami na terenie kampusu uczelni.
+
+    ## Autentykacja
+    Endpointy oznaczone 🔒 wymagają nagłówka:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+    Token uzyskujesz z `POST /api/auth/login/`.
+
+    ## Role
+    - **REPORTER** — domyślna rola (studenci, pracownicy). Może zgłaszać usterki i przeglądać swoje.
+    - **COORDINATOR** — zarządza zgłoszeniami, zmienia statusy, widzi panel admina.
+
+servers:
+  - url: http://localhost:8000
+    description: Lokalny serwer deweloperski (Docker)
+
+tags:
+  - name: Auth
+    description: Rejestracja, logowanie, tokeny JWT
+  - name: Tickets
+    description: CRUD zgłoszeń usterek, geofencing, duplikaty
+  - name: Buildings
+    description: Słownik budynków kampusu
+  - name: Categories
+    description: Słownik kategorii usterek
+  - name: Notifications
+    description: Powiadomienia in-app
+  - name: Reports
+    description: Cotygodniowe raporty AI
+  - name: Stats
+    description: Statystyki dashboardu
+
+# ─────────────────────────────────────────────────────────
+# Bezpieczeństwo
+# ─────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ─── Wspólne schematy ──────────────────────────────────
+  schemas:
+
+    # --- Użytkownik ---
+    UserShort:
+      type: object
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [REPORTER, COORDINATOR]
+
+    # --- Auth ---
+    RegisterRequest:
+      type: object
+      required: [first_name, last_name, email, password, password_confirm]
+      properties:
+        first_name:
+          type: string
+          example: Jan
+        last_name:
+          type: string
+          example: Kowalski
+        email:
+          type: string
+          format: email
+          example: jan@student.pk.edu.pl
+        password:
+          type: string
+          format: password
+          example: SecurePass123!
+        password_confirm:
+          type: string
+          format: password
+          example: SecurePass123!
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: jan@student.pk.edu.pl
+        password:
+          type: string
+          format: password
+          example: SecurePass123!
+
+    TokenPair:
+      type: object
+      properties:
+        access:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        refresh:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+
+    TokenRefreshRequest:
+      type: object
+      required: [refresh]
+      properties:
+        refresh:
+          type: string
+
+    TokenRefreshResponse:
+      type: object
+      properties:
+        access:
+          type: string
+
+    # --- Kategoria ---
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Instalacja wodna
+        icon:
+          type: string
+          example: "💧"
+        color:
+          type: string
+          example: "#2196F3"
+
+    # --- Budynek ---
+    Building:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Budynek C-4
+        centroid:
+          $ref: "#/components/schemas/GeoJSONPoint"
+
+    # --- GeoJSON Point ---
+    GeoJSONPoint:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [Point]
+        coordinates:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          example: [19.9123, 50.0654]
+
+    # --- Ticket (lista) ---
+    TicketListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          example: Pęknięta rura w łazience
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        priority:
+          $ref: "#/components/schemas/TicketPriority"
+        category:
+          $ref: "#/components/schemas/Category"
+        building:
+          $ref: "#/components/schemas/Building"
+        reporter:
+          $ref: "#/components/schemas/UserShort"
+        image:
+          type: string
+          description: Ścieżka do pliku zdjęcia (lokalnie lub S3)
+          example: tickets/42/photo.webp
+        created_at:
+          type: string
+          format: date-time
+
+    # --- Ticket (pełny) ---
+    TicketDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/Category"
+        building:
+          $ref: "#/components/schemas/Building"
+        floor:
+          type: integer
+          nullable: true
+          example: 2
+        room:
+          type: string
+          nullable: true
+          example: "204"
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        priority:
+          $ref: "#/components/schemas/TicketPriority"
+        location:
+          $ref: "#/components/schemas/GeoJSONPoint"
+        image:
+          type: string
+          description: Ścieżka do pliku zdjęcia
+          example: tickets/42/photo.webp
+        reporter:
+          $ref: "#/components/schemas/UserShort"
+        assigned_to:
+          allOf:
+            - $ref: "#/components/schemas/UserShort"
+          nullable: true
+        parent_ticket:
+          type: integer
+          nullable: true
+          description: ID ticketa-rodzica (jeśli duplikat)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        audit_log:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
+
+    # --- Audit Log ---
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        user:
+          $ref: "#/components/schemas/UserShort"
+        field_changed:
+          type: string
+          example: status
+        old_value:
+          type: string
+          example: NEW
+        new_value:
+          type: string
+          example: IN_PROGRESS
+        created_at:
+          type: string
+          format: date-time
+
+    # --- Notification ---
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        ticket:
+          type: object
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+        message:
+          type: string
+          example: "Status Twojego zgłoszenia zmieniony na: IN_PROGRESS"
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # --- Weekly Report ---
+    WeeklyReport:
+      type: object
+      properties:
+        id:
+          type: integer
+        week_start:
+          type: string
+          format: date
+        week_end:
+          type: string
+          format: date
+        content:
+          type: string
+          nullable: true
+          description: Tekst wygenerowany przez model HF (null jeśli model niedostępny)
+        raw_stats:
+          type: object
+          properties:
+            total_created:
+              type: integer
+            total_resolved:
+              type: integer
+            total_open:
+              type: integer
+            top_category:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                count:
+                  type: integer
+            top_building:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                count:
+                  type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    # --- Enums ---
+    TicketStatus:
+      type: string
+      enum: [NEW, IN_PROGRESS, NEEDS_REVIEW, RESOLVED, CLOSED, ARCHIVED]
+
+    TicketPriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+
+    # --- Pagination wrapper ---
+    PaginatedResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+
+    # --- Error ---
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Lokalizacja znajduje się poza terenem kampusu.
+            details:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+
+# ─────────────────────────────────────────────────────────
+# Endpointy
+# ─────────────────────────────────────────────────────────
+paths:
+
+  # ═══════════════════════════════════════════════════════
+  # AUTH
+  # ═══════════════════════════════════════════════════════
+
+  /api/auth/register/:
+    post:
+      tags: [Auth]
+      summary: Rejestracja nowego użytkownika
+      description: Tworzy użytkownika z domyślną rolą REPORTER.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Użytkownik utworzony
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          description: Błąd walidacji (email zajęty, hasła nie pasują)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/login/:
+    post:
+      tags: [Auth]
+      summary: Logowanie (JWT)
+      description: Zwraca parę tokenów JWT (access + refresh).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Para tokenów JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: Nieprawidłowy email lub hasło
+
+  /api/auth/token/refresh/:
+    post:
+      tags: [Auth]
+      summary: Odświeżenie access tokenu
+      description: Axios interceptor wywołuje to automatycznie przy 401.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRefreshRequest"
+      responses:
+        "200":
+          description: Nowy access token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenRefreshResponse"
+        "401":
+          description: Refresh token wygasł lub nieprawidłowy
+
+  /api/auth/me/:
+    get:
+      tags: [Auth]
+      summary: Profil zalogowanego użytkownika
+      description: Frontend używa do inicjalizacji AuthContext i sprawdzenia roli.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Profil użytkownika
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Brak tokenu JWT
+
+  # ═══════════════════════════════════════════════════════
+  # TICKETS
+  # ═══════════════════════════════════════════════════════
+
+  /api/tickets/:
+    post:
+      tags: [Tickets]
+      summary: Utworzenie nowego zgłoszenia
+      description: |
+        Multipart form-data (zdjęcie + dane). Backend:
+        1. Waliduje dane
+        2. Sprawdza geofencing (PostGIS)
+        3. Kompresuje zdjęcie (Pillow → WEBP)
+        4. Zapisuje plik lokalnie / S3
+        5. W DB przechowuje ścieżkę do pliku
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, description, category_id, latitude, longitude, image]
+              properties:
+                title:
+                  type: string
+                  example: Pęknięta rura w łazience
+                description:
+                  type: string
+                  minLength: 10
+                  example: Cieknie woda z rury pod umywalką na 2 piętrze...
+                category_id:
+                  type: integer
+                  example: 3
+                building_id:
+                  type: integer
+                  nullable: true
+                  example: 5
+                floor:
+                  type: integer
+                  nullable: true
+                  example: 2
+                room:
+                  type: string
+                  nullable: true
+                  example: "204"
+                latitude:
+                  type: number
+                  format: float
+                  example: 50.0654
+                longitude:
+                  type: number
+                  format: float
+                  example: 19.9123
+                image:
+                  type: string
+                  format: binary
+                  description: "Zdjęcie usterki (JPEG/PNG, max 10MB)"
+      responses:
+        "201":
+          description: Zgłoszenie utworzone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDetail"
+        "400":
+          description: "Błąd walidacji lub geofencing (lokalizacja poza kampusem)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Brak tokenu JWT
+        "429":
+          description: "Rate limit (max 3 zgłoszenia / 5 min) — od Milestone 5"
+
+    get:
+      tags: [Tickets]
+      summary: Lista wszystkich zgłoszeń (Koordynator)
+      description: Paginowana lista z filtrami i sortowaniem. Dostępna tylko dla COORDINATOR.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+        - name: priority
+          in: query
+          schema:
+            $ref: "#/components/schemas/TicketPriority"
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: building_id
+          in: query
+          schema:
+            type: integer
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: ordering
+          in: query
+          schema:
+            type: string
+            enum: [created_at, -created_at, priority, -priority, status]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Lista zgłoszeń
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/TicketListItem"
+
+  /api/tickets/{id}/:
+    get:
+      tags: [Tickets]
+      summary: Szczegóły zgłoszenia
+      description: Pełne dane ticketa z audit log. Reporter widzi swoje, koordynator — wszystkie.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Szczegóły ticketa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDetail"
+        "403":
+          description: Reporter próbuje zobaczyć cudzy ticket
+        "404":
+          description: Ticket nie istnieje
+
+    patch:
+      tags: [Tickets]
+      summary: Edycja zgłoszenia (Koordynator)
+      description: |
+        Zmiana statusu, priorytetu, przypisanie osoby. Każda zmiana → wpis w AuditLog.
+        Zmiana na RESOLVED wymaga `resolution_note`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/TicketStatus"
+                priority:
+                  $ref: "#/components/schemas/TicketPriority"
+                assigned_to_id:
+                  type: integer
+                  nullable: true
+                resolution_note:
+                  type: string
+                  description: Wymagana przy zmianie statusu na RESOLVED
+            example:
+              status: RESOLVED
+              priority: HIGH
+              assigned_to_id: 4
+              resolution_note: "Rura wymieniona, przeciek naprawiony."
+      responses:
+        "200":
+          description: Ticket zaktualizowany
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDetail"
+        "400":
+          description: Zmiana na RESOLVED bez resolution_note
+        "403":
+          description: Użytkownik nie jest koordynatorem
+
+  /api/tickets/my/:
+    get:
+      tags: [Tickets]
+      summary: Moje zgłoszenia
+      description: Lista zgłoszeń zalogowanego użytkownika (reporter=current_user). Te same filtry co GET /api/tickets/.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+        - name: ordering
+          in: query
+          schema:
+            type: string
+            enum: [created_at, -created_at, priority, -priority]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Lista moich zgłoszeń
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/TicketListItem"
+
+  /api/tickets/nearby/:
+    get:
+      tags: [Tickets]
+      summary: Podobne zgłoszenia w okolicy (pre-check duplikatów)
+      description: Frontend wywołuje to PRZED wysłaniem nowego zgłoszenia — szuka otwartych ticketów w promieniu ~50m.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: category_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: radius
+          in: query
+          schema:
+            type: integer
+            default: 50
+            description: Promień w metrach
+      responses:
+        "200":
+          description: Lista podobnych zgłoszeń
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        title:
+                          type: string
+                        status:
+                          $ref: "#/components/schemas/TicketStatus"
+                        category:
+                          $ref: "#/components/schemas/Category"
+                        created_at:
+                          type: string
+                          format: date-time
+
+  /api/tickets/{id}/confirm-duplicate/:
+    post:
+      tags: [Tickets]
+      summary: Potwierdzenie duplikatu
+      description: |
+        Użytkownik potwierdza, że jego zgłoszenie to duplikat istniejącego ticketa.
+        Triggeruje task Celery `verify_duplicate_ai` (model HF, próg >0.85).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID istniejącego ticketa (parent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_ticket_data]
+              properties:
+                new_ticket_data:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    description:
+                      type: string
+                    category_id:
+                      type: integer
+                    latitude:
+                      type: number
+                    longitude:
+                      type: number
+      responses:
+        "202":
+          description: Przesłane do weryfikacji AI
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Zgłoszenie przesłane do weryfikacji AI. Otrzymasz powiadomienie o wyniku.
+                  parent_ticket_id:
+                    type: integer
+                  verification_status:
+                    type: string
+                    enum: [PENDING]
+
+  /api/tickets/{id}/confirm-resolution/:
+    post:
+      tags: [Tickets]
+      summary: Feedback po rozwiązaniu ticketa
+      description: |
+        Opcjonalny feedback od reportera. Po ustawieniu RESOLVED:
+        - **Potwierdzenie** → status CLOSED
+        - **Uwaga ze zdjęciem** → status NEEDS_REVIEW (koordynator weryfikuje)
+        - **Brak reakcji 3 dni** → automatyczne zamknięcie (CLOSED)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmed]
+              properties:
+                confirmed:
+                  type: boolean
+            example:
+              confirmed: true
+          multipart/form-data:
+            schema:
+              type: object
+              required: [confirmed, feedback_note, feedback_image]
+              properties:
+                confirmed:
+                  type: boolean
+                  example: false
+                feedback_note:
+                  type: string
+                  description: Opis problemu (wymagany przy confirmed=false)
+                feedback_image:
+                  type: string
+                  format: binary
+                  description: Zdjęcie jako dowód (wymagane przy confirmed=false)
+      responses:
+        "200":
+          description: Feedback zapisany
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  status:
+                    $ref: "#/components/schemas/TicketStatus"
+                  message:
+                    type: string
+              examples:
+                confirmed:
+                  summary: Potwierdzenie naprawy
+                  value:
+                    id: 42
+                    status: CLOSED
+                    message: Dziękujemy za potwierdzenie naprawy.
+                rejected:
+                  summary: Zgłoszenie uwagi
+                  value:
+                    id: 42
+                    status: NEEDS_REVIEW
+                    message: Twoja uwaga została przekazana koordynatorowi do weryfikacji.
+        "400":
+          description: "Ticket nie ma statusu RESOLVED / brak zdjęcia / minął termin 3 dni"
+        "403":
+          description: Użytkownik nie jest reporterem tego ticketa
+
+  /api/tickets/geojson/:
+    get:
+      tags: [Tickets]
+      summary: Dane GeoJSON do mapy (markery)
+      description: Aktywne tickety w formacie GeoJSON do react-leaflet.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bbox
+          in: query
+          schema:
+            type: string
+            example: "19.90,50.06,19.92,50.07"
+          description: "Bounding box: min_lng,min_lat,max_lng,max_lat"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+          description: Domyślnie wyklucza CLOSED i ARCHIVED
+      responses:
+        "200":
+          description: GeoJSON FeatureCollection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [FeatureCollection]
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [Feature]
+                        geometry:
+                          $ref: "#/components/schemas/GeoJSONPoint"
+                        properties:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            title:
+                              type: string
+                            category:
+                              type: string
+                            priority:
+                              $ref: "#/components/schemas/TicketPriority"
+                            status:
+                              $ref: "#/components/schemas/TicketStatus"
+                            created_at:
+                              type: string
+                              format: date-time
+
+  /api/tickets/heatmap-data/:
+    get:
+      tags: [Tickets]
+      summary: Dane do heatmapy
+      description: |
+        Zagregowane punkty do warstwy heatmap (leaflet.heat).
+        Widoczne zarówno dla koordynatora jak i zwykłego użytkownika (PWA).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista punktów heatmap
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lat:
+                          type: number
+                        lng:
+                          type: number
+                        intensity:
+                          type: integer
+              example:
+                points:
+                  - { lat: 50.0654, lng: 19.9123, intensity: 7 }
+                  - { lat: 50.0670, lng: 19.9100, intensity: 3 }
+
+  # ═══════════════════════════════════════════════════════
+  # BUILDINGS
+  # ═══════════════════════════════════════════════════════
+
+  /api/buildings/:
+    get:
+      tags: [Buildings]
+      summary: Lista budynków kampusu
+      description: "Publiczny — potrzebny do dropdownów w formularzu i wyświetlenia mapy."
+      responses:
+        "200":
+          description: Lista budynków
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Building"
+              example:
+                - id: 1
+                  name: "Budynek Główny (C-1)"
+                  centroid: { type: Point, coordinates: [19.9120, 50.0660] }
+                - id: 2
+                  name: "Biblioteka Główna"
+                  centroid: { type: Point, coordinates: [19.9135, 50.0648] }
+
+  # ═══════════════════════════════════════════════════════
+  # CATEGORIES
+  # ═══════════════════════════════════════════════════════
+
+  /api/categories/:
+    get:
+      tags: [Categories]
+      summary: Lista kategorii usterek
+      description: "Publiczny — potrzebny do formularza i filtrów."
+      responses:
+        "200":
+          description: Lista kategorii
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+              example:
+                - { id: 1, name: "Elektryczność", icon: "⚡", color: "#FFC107" }
+                - { id: 2, name: "Ogrzewanie / Wentylacja", icon: "🌡️", color: "#FF5722" }
+                - { id: 3, name: "Instalacja wodna", icon: "💧", color: "#2196F3" }
+
+  # ═══════════════════════════════════════════════════════
+  # NOTIFICATIONS
+  # ═══════════════════════════════════════════════════════
+
+  /api/notifications/:
+    get:
+      tags: [Notifications]
+      summary: Lista powiadomień
+      description: Powiadomienia zalogowanego użytkownika z liczbą nieprzeczytanych.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: is_read
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Lista powiadomień
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  unread_count:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+
+  /api/notifications/{id}/read/:
+    patch:
+      tags: [Notifications]
+      summary: Oznacz powiadomienie jako przeczytane
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_read:
+                  type: boolean
+                  default: true
+      responses:
+        "200":
+          description: Powiadomienie zaktualizowane
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  is_read:
+                    type: boolean
+
+  # ═══════════════════════════════════════════════════════
+  # REPORTS
+  # ═══════════════════════════════════════════════════════
+
+  /api/reports/weekly/:
+    get:
+      tags: [Reports]
+      summary: Lista raportów tygodniowych (Koordynator)
+      description: |
+        Raporty generowane co piątek przez Celery Beat + Hugging Face.
+        `content` = tekst AI (null jeśli model niedostępny — wtedy widoczne `raw_stats`).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Lista raportów
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/WeeklyReport"
+
+  # ═══════════════════════════════════════════════════════
+  # STATS
+  # ═══════════════════════════════════════════════════════
+
+  /api/stats/dashboard/:
+    get:
+      tags: [Stats]
+      summary: Statystyki ogólne systemu (Koordynator)
+      description: Zasilenie komponentów StatCard i RecentActivityCard na dashboardzie.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Statystyki dashboardu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_tickets:
+                    type: integer
+                  open_count:
+                    type: integer
+                  in_progress_count:
+                    type: integer
+                  resolved_count:
+                    type: integer
+                  this_week_count:
+                    type: integer
+                  recent_activity:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ticket_id:
+                          type: integer
+                        ticket_title:
+                          type: string
+                        action:
+                          type: string
+                          enum: [status_changed, comment_added, ticket_created]
+                        old_value:
+                          type: string
+                          nullable: true
+                        new_value:
+                          type: string
+                          nullable: true
+                        user:
+                          $ref: "#/components/schemas/UserShort"
+                        created_at:
+                          type: string
+                          format: date-time
+
+  /api/stats/my/:
+    get:
+      tags: [Stats]
+      summary: Statystyki personalne użytkownika
+      description: Ile zgłoszeń użytkownika jest w poszczególnych statusach.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Statystyki personalne
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_tickets:
+                    type: integer
+                  new_count:
+                    type: integer
+                  in_progress_count:
+                    type: integer
+                  resolved_count:
+                    type: integer
+                  closed_count:
+                    type: integer
+                  needs_review_count:
+                    type: integer
+              example:
+                total_tickets: 12
+                new_count: 2
+                in_progress_count: 3
+                resolved_count: 1
+                closed_count: 6
+                needs_review_count: 0
