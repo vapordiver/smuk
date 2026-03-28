@@ -1,10 +1,23 @@
-django>=5.1,<5.2
-djangorestframework>=3.15,<4
-django-cors-headers>=4.4,<5
-psycopg[binary]>=3.2,<4
-celery[redis]>=5.4,<6
-gunicorn>=22,<23
-Pillow>=10.2,<11
-django-environ>=0.11,<1
-boto3>=1.28.0
-django-storages>=1.14.0
+# Django + REST
+django==5.2.12
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+django-filter==25.2
+
+# Baza danych
+psycopg[binary]==3.3.3
+
+# Celery + Redis
+celery[redis]==5.6.2
+
+# Serwer WSGI
+gunicorn==25.3.0
+
+# Media / pliki
+Pillow==12.1.1
+boto3>=1.42,<2
+django-storages==1.14.6
+
+# Konfiguracja
+django-environ==0.13.0
