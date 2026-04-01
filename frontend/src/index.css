@@ -1,16 +1,74 @@
 @import "tailwindcss";
 
+/* ── Indigo Scholar Design System ── */
 @theme {
+  /* ─ Typography ─ */
   --font-lexend: "Lexend", sans-serif;
-  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05);
+
+  /* ─ Primary palette ─ */
   --color-primary: #1132d4;
+  --color-primary-container: #1132d4;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #ffffff;
+  --color-primary-fixed: #dfe0ff;
+  --color-primary-fixed-dim: #bbc3ff;
+
+  /* ─ Secondary ─ */
+  --color-secondary: #059669;
+  --color-secondary-container: #dcfce7;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #065f46;
+
+  /* ─ Tertiary / Error ─ */
+  --color-tertiary: #6c1000;
+  --color-tertiary-container: #951a00;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #ffa591;
+  --color-error: #e11d48;
+  --color-error-container: #fff1f2;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #9f1239;
+
+  /* ─ Surfaces ─ */
+  --color-background: #f6f6f8;
+  --color-on-background: #0f172a;
+  --color-surface: #ffffff;
+  --color-surface-variant: #f8fafc;
+  --color-surface-dim: #dad9e5;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f6f6f8;
+  --color-surface-container: #eeecf9;
+  --color-surface-container-high: #e8e7f4;
+  --color-surface-container-highest: #e3e1ee;
+  --color-surface-tint: #1132d4;
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #64748b;
+  --color-inverse-surface: #1e293b;
+  --color-inverse-on-surface: #f1effc;
+  --color-inverse-primary: #bbc3ff;
+
+  /* ─ Outlines ─ */
+  --color-outline: #e2e8f0;
+  --color-outline-variant: #cbd5e1;
+
+  /* ─ Shadows (Soft Elevation) ─ */
+  --shadow-soft: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 10px 15px -3px rgba(17, 50, 212, 0.2);
+
+  /* ─ Border Radii ─ */
+  --radius-card: 0.75rem;
+  --radius-button: 0.75rem;
+  --radius-pill: 9999px;
 }
 
 @layer base {
   body {
     font-family: var(--font-lexend);
-    background-color: #f9fafb;
-    color: #111827;
+    background-color: var(--color-background);
+    color: var(--color-on-background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   input,
@@ -19,5 +77,29 @@
   button {
     outline: none;
     border: none;
+    font-family: inherit;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+
+  /* Smooth transitions globally */
+  * {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Custom scrollbar for the main content */
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-outline);
+    border-radius: 9999px;
   }
 }
