@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import CampusMap from './pages/CampusMap';
 import AdminPanel from './pages/AdminPanel';
+import ProfilePage from './pages/ProfilePage';
 
 /**
  * Layout – Shell with TopNavBar + SideNavBar + content area
@@ -25,8 +26,8 @@ function Layout() {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        {/* Main content – offset by sidebar width on desktop */}
-        <div className="flex-1 md:ml-64 overflow-hidden">
+        {/* Main content – offset by collapsed sidebar width on desktop */}
+        <div className="flex-1 md:ml-[72px] overflow-hidden">
           <Outlet />
         </div>
       </div>
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/my-tickets" element={<MyTickets />} />
           <Route path="/map" element={<CampusMap />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         {/* Auth routes – no sidebar */}

@@ -103,3 +103,109 @@
     border-radius: 9999px;
   }
 }
+
+/* ── Collapsible Sidebar ── */
+
+/* Mobile: always full-width when visible */
+.sidebar-aside {
+  width: 16rem !important; /* 256px */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Desktop: collapsed by default */
+@media (min-width: 768px) {
+  .sidebar-aside {
+    width: 72px !important;
+  }
+
+  .sidebar-aside:hover {
+    width: 16rem !important; /* 256px */
+  }
+
+  /* Hide labels when collapsed */
+  .sidebar-label {
+    opacity: 0 !important;
+    width: 0 !important;
+    overflow: hidden;
+    transition: opacity 0.2s ease, width 0.2s ease;
+  }
+
+  .sidebar-aside:hover .sidebar-label {
+    opacity: 1 !important;
+    width: auto !important;
+  }
+
+  /* Hide header when collapsed */
+  .sidebar-header {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin-bottom: 0 !important;
+    overflow: hidden;
+    transition: max-height 0.2s ease, opacity 0.2s ease, margin-bottom 0.2s ease;
+  }
+
+  .sidebar-aside:hover .sidebar-header {
+    max-height: 4rem !important;
+    opacity: 1 !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Center icons when collapsed */
+  .sidebar-link {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    transition: padding 0.2s ease;
+  }
+
+  .sidebar-aside:hover .sidebar-link {
+    justify-content: flex-start !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  /* CTA button: icon-only when collapsed, full when expanded */
+  .sidebar-cta-full {
+    display: none !important;
+  }
+
+  .sidebar-cta-icon {
+    display: flex !important;
+  }
+
+  .sidebar-aside:hover .sidebar-cta-full {
+    display: block !important;
+  }
+
+  .sidebar-aside:hover .sidebar-cta-icon {
+    display: none !important;
+  }
+}
+
+/* Mobile: always show labels */
+@media (max-width: 767px) {
+  .sidebar-label {
+    opacity: 1 !important;
+    width: auto !important;
+  }
+
+  .sidebar-header {
+    max-height: 4rem !important;
+    opacity: 1 !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .sidebar-link {
+    justify-content: flex-start !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .sidebar-cta-full {
+    display: block !important;
+  }
+
+  .sidebar-cta-icon {
+    display: none !important;
+  }
+}

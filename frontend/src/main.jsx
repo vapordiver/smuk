@@ -1,15 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.jsx'
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('SW zarejestrowany: ', reg.scope))
-      .catch(err => console.error('Błąd rejestracji SW: ', err))
-  })
-}
+registerSW({ immediate: true })
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
