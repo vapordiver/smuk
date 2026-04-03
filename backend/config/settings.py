@@ -39,7 +39,10 @@ INSTALLED_APPS = [
     "corsheaders",
     "django.contrib.gis",
     "storages",
+    "users",
 ]
+
+AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
