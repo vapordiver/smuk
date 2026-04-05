@@ -114,8 +114,12 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://www.django-rest-framework.org
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication', # safe to delete if /admin/ endpoint ever becomes unused
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
-        'rest_framework_simplejwt.authentication.JWTAuthentication'
+        'rest_framework.permissions.IsAuthenticated',
     ]
 }
 
