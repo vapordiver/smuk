@@ -21,7 +21,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         # id & role are only returned from response
         read_only_fields = ['id', 'role']
-        extra_kwargs = {'password': {'write_only': True}}
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'first_name': {'required': True},
+            'last_name': {'required': True}
+        }
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
