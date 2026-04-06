@@ -6,12 +6,13 @@ from .serializers import RegisterSerializer, UserSerializer
 
 User = get_user_model()
 
-
+# POST
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
+# GET
 class UserView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]

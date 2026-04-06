@@ -8,6 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Serializer used in /api/auth/register/ endpoint
+    """
+
     # only for validation purposes
     password_confirm = serializers.CharField(write_only=True)
 
@@ -27,7 +31,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password_confirm')
-        
+
         # create_user() hashes password and normalizes email
         user = User.objects.create_user(**validated_data)
 
@@ -44,6 +48,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 class UserSerializer(serializers.ModelSerializer):
+    """
+    Serializer used in /api/auth/me/ endpoint.
+    """
+    
     class Meta:
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'role']
