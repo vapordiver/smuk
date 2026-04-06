@@ -1,5 +1,10 @@
 from rest_framework import serializers
-from .models import User
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+import logging
+
+User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -11,14 +16,18 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
     def create(self, validated_data):
-        user = User(
-            email=validated_data['email'],
-            username=validated_data['username']
-        )
+        # create_user() hashes password and normalizes email
+        user = User.objects.create_user(**validated_data)
 
-        user.set_password(validated_data['password'])
-
-        user.save()
+        try:
+            group = Group.objects.get(name=user.role.upper()) # always uppercase, refer to migration 0002
+            user.groups.add(group)
+        except Group.DoesNotExist:
+            logger.error(f'ERROR: Group {user.role.upper()} does not exist!')
+            user.delete()
+            raise serializers.ValidationError(
+                {"detail": "Server Error: User cannot be added to the group. Contact the administrator."}
+            )
 
         return user
 
