@@ -8,14 +8,26 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    # only for validation purposes
+    password_confirm = serializers.CharField(write_only=True)
+
     class Meta:
         model = User
-        fields = ['username', 'email', 'password']
+        fields = ['id', 'first_name', 'last_name', 'email', 'password', 'password_confirm', 'role']
 
+        # id & role are only returned from response
+        read_only_fields = ['id', 'role']
         extra_kwargs = {'password': {'write_only': True}}
 
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password": "Passwords do not match."})
+        
+        return attrs
 
     def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        
         # create_user() hashes password and normalizes email
         user = User.objects.create_user(**validated_data)
 
