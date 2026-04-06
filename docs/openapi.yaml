@@ -55,7 +55,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         first_name:
           type: string
         last_name:
@@ -65,7 +66,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         email:
           type: string
           format: email
@@ -676,7 +678,8 @@ paths:
                 priority:
                   $ref: "#/components/schemas/TicketPriority"
                 assigned_to_id:
-                  type: integer
+                  type: string
+                  format: uuid
                   nullable: true
                 resolution_note:
                   type: string
