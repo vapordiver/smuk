@@ -21,10 +21,26 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         # id & role are only returned from response
         read_only_fields = ['id', 'role']
+        
+        # first_name and last_name are required and cannot be blank
         extra_kwargs = {
             'password': {'write_only': True},
-            'first_name': {'required': True},
-            'last_name': {'required': True}
+            'first_name': {
+                'required': True,
+                'allow_blank': False,
+                'error_messages': {
+                    'blank': 'First name cannot be blank.',
+                    'required': 'First name is required.'
+                }
+            },
+            'last_name': {
+                'required': True,
+                'allow_blank': False,
+                'error_messages': {
+                    'blank': 'Last name cannot be blank.',
+                    'required': 'Last name is required.'
+                }
+            }
         }
 
     def validate(self, attrs):
