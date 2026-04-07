@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.contrib.auth.password_validation import validate_password
+from django.core import exceptions
 import logging
 
 User = get_user_model()
@@ -49,6 +51,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         if not any(value.lower().endswith(domain) for domain in allowed_domains):
             raise serializers.ValidationError("Email address should belong to the @edu.p.lodz.pl or @p.lodz.pl domain.")
 
+        return value
+
+    def validate_password(self, value):
+        """
+        Use Django's built-in password validator.
+        To change the behaviour, go to settings.py and modify AUTH_PASSWORD_VALIDATORS list
+        """
+        try:
+            validate_password(value)
+        except exceptions.ValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        
         return value
 
     def validate(self, attrs):
