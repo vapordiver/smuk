@@ -21,7 +21,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         # id & role are only returned from response
         read_only_fields = ['id', 'role']
-        
+
         # first_name and last_name are required and cannot be blank
         extra_kwargs = {
             'password': {'write_only': True},
@@ -42,6 +42,14 @@ class RegisterSerializer(serializers.ModelSerializer):
                 }
             }
         }
+
+    def validate_email(self, value):
+        allowed_domains = ['@edu.p.lodz.pl', '@p.lodz.pl']
+
+        if not any(value.lower().endswith(domain) for domain in allowed_domains):
+            raise serializers.ValidationError("Email address should belong to the @edu.p.lodz.pl or @p.lodz.pl domain.")
+
+        return value
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
