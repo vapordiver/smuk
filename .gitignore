@@ -15,6 +15,7 @@ media/
 # ── Node / Frontend ──────────────────────────
 node_modules/
 frontend/dist/
+frontend/dev-dist/
 dist/
 
 # ── IDE ───────────────────────────────────────

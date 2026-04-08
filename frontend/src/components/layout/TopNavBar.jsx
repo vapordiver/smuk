@@ -11,17 +11,21 @@ export default function TopNavBar({ onToggleSidebar }) {
   return (
     <header className="sticky top-0 z-50 flex justify-between items-center w-full px-6 h-16 bg-white/80 backdrop-blur-md shadow-soft border-b border-outline">
       <div className="flex items-center gap-4">
-        {/* Mobile hamburger */}
+        {/* Sidebar toggle */}
         <button
           onClick={onToggleSidebar}
-          className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors"
+          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors"
           aria-label="Toggle menu"
         >
           <span className="material-symbols-outlined">menu</span>
         </button>
 
         {/* Brand */}
-        <Link to="/" className="text-xl font-bold tracking-tight text-primary">
+        <Link
+          to="/"
+          className="font-bold tracking-tight text-primary"
+          style={{ fontSize: 'clamp(1.1rem, 4vw, 1.25rem)' }}
+        >
           SMUK
         </Link>
       </div>

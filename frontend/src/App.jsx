@@ -26,8 +26,8 @@ function Layout() {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        {/* Main content – offset by collapsed sidebar width on desktop */}
-        <div className="flex-1 md:ml-[72px] overflow-hidden">
+        {/* Main content */}
+        <div className="flex-1 overflow-hidden">
           <Outlet />
         </div>
       </div>

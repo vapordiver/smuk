@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ImpactButton from '../common/ImpactButton';
 
 /**
- * SideNavBar – Collapsible sidebar (icon-only → expanded)
- * Desktop: collapsed by default (icons only, 72px), expands on hover (256px) using CSS group-hover.
- * Mobile: full overlay triggered by hamburger.
+ * SideNavBar – Click-toggle sidebar overlay
+ * Both desktop and mobile: hidden by default, opens as overlay when toggled via hamburger.
  *
  * Role mock: will be replaced by AuthContext in SMUK-7.
  *
@@ -51,14 +49,14 @@ export default function SideNavBar({ isOpen, onClose }) {
 
   const roleLink = userRole === 'COORDINATOR'
     ? { to: '/admin', icon: 'admin_panel_settings', label: 'Panel Koordynatora' }
-    : {};
+    : null;
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Overlay backdrop — all screen sizes */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/30 z-40 md:hidden"
+          className="fixed inset-0 bg-black/30 z-40"
           onClick={onClose}
         />
       )}
@@ -67,13 +65,14 @@ export default function SideNavBar({ isOpen, onClose }) {
         className={`
           sidebar-aside
           fixed left-0 top-16 h-[calc(100vh-4rem)] z-40
+          w-64
           flex flex-col py-4 px-2 gap-1
           bg-surface-container-low
           border-r border-outline
           overflow-hidden
+          transition-transform duration-300 ease-in-out
 
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:translate-x-0
         `}
       >
         {/* Department header — only visible when expanded */}
@@ -97,13 +96,15 @@ export default function SideNavBar({ isOpen, onClose }) {
         {/* Bottom section */}
         <div className="mt-auto flex flex-col gap-2 pb-4">
           {/* Role-based link */}
-          <NavLink
-            to={roleLink.to}
-            icon={roleLink.icon}
-            label={roleLink.label}
-            isActive={location.pathname === roleLink.to}
-            onClick={onClose}
-          />
+          {roleLink && (
+            <NavLink
+              to={roleLink.to}
+              icon={roleLink.icon}
+              label={roleLink.label}
+              isActive={location.pathname === roleLink.to}
+              onClick={onClose}
+            />
+          )}
 
           {/* New report CTA */}
           <Link to="/report" onClick={onClose} title="Nowe zgłoszenie">
