@@ -3,9 +3,7 @@ from django.conf import settings
 from django.contrib.gis.db import models as gis_models
 from django.core.validators import RegexValidator
 
-# Create your models here.
 
-# TODO: zarejestrowac apke na koniec!!!
 class FaultCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     icon = models.CharField(max_length=10)
@@ -125,7 +123,7 @@ class AuditLog(models.Model):
     )
 
     field_changed = models.CharField(max_length=50)
-    
+
     old_value = models.TextField(null=True, blank=True)
     new_value = models.TextField(null=True, blank=True)
 
