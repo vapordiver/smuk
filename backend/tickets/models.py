@@ -30,7 +30,7 @@ class FaultCategory(models.Model):
 
 class Building(models.Model):
     name = models.CharField(max_length=100)
-    
+
     polygon = gis_models.PolygonField(srid=4326, blank=True, null=True)
     centroid = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
 
@@ -40,20 +40,20 @@ class Building(models.Model):
 
 class Ticket(models.Model):
     class Status(models.TextChoices):
-        NEW = 'new', 'New'
-        IN_PROGRESS = 'in_progress', 'In Progress'
-        NEEDS_REVIEW = 'needs_review', 'Needs Review'
-        RESOLVED = 'resolved', 'Resolved'
-        CLOSED = 'closed', 'Closed'
-        ARCHIVED =  'archived', 'Archived'
+        NEW = 'NEW', 'New'
+        IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+        NEEDS_REVIEW = 'NEEDS_REVIEW', 'Needs Review'
+        RESOLVED = 'RESOLVED', 'Resolved'
+        CLOSED = 'CLOSED', 'Closed'
+        ARCHIVED =  'ARCHIVED', 'Archived'
 
     class Priority(models.TextChoices):
-        LOW = 'low', 'Low'
-        MEDIUM = 'medium', 'Medium'
-        HIGH = 'high', 'High'
-        CRITICAL = 'critical', 'Critical'
+        LOW = 'LOW', 'Low'
+        MEDIUM = 'MEDIUM', 'Medium'
+        HIGH = 'HIGH', 'High'
+        CRITICAL = 'CRITICAL', 'Critical'
 
-    title = models.CharField(max_length=20)
+    title = models.CharField(max_length=100)
     description = models.TextField()
     
     category = models.ForeignKey(
@@ -125,8 +125,10 @@ class AuditLog(models.Model):
     )
 
     field_changed = models.CharField(max_length=50)
-    old_value = models.CharField(max_length=255, null=True, blank=True)
-    new_value = models.CharField(max_length=255, null=True, blank=True)
+    
+    old_value = models.TextField(null=True, blank=True)
+    new_value = models.TextField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
