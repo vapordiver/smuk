@@ -63,10 +63,12 @@ class Ticket(models.Model):
 
 
 class Building(models.Model):
-    pass
-    # id
-    # name
-    # centroid
+    
+    name = models.CharField(max_length=100)
+    centroid = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
+
+    def __str__(self):
+        return self.name
 
 class FaultCategory(models.Model):
     pass
