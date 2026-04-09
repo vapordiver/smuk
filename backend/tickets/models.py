@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from django.conrtib.gis.db import models as gis_models
+from django.contrib.gis.db import models as gis_models
 
 # Create your models here.
 
@@ -8,8 +8,8 @@ from django.conrtib.gis.db import models as gis_models
 class Ticket(models.Model):
     class Status(models.TextChoices):
         NEW = 'new', 'New'
-        IN_PROGRESS = 'in_progress', 'In_progress'
-        NEEDS_REVIEW = 'needs_review', 'Needs_review'
+        IN_PROGRESS = 'in_progress', 'In Progress'
+        NEEDS_REVIEW = 'needs_review', 'Needs Review'
         RESOLVED = 'resolved', 'Resolved'
         CLOSED = 'closed', 'Closed'
         ARCHIVED =  'archived', 'Archived'
@@ -24,15 +24,42 @@ class Ticket(models.Model):
     description = models.TextField()
     # category (fk)
     # building (fk, nullable)
-    floor = models.IntegerField(blank=True)
+    floor = models.IntegerField(blank=True, null=True)
     room = models.CharField(max_length=20, blank=True)
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.LOW)
+
     location = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
-    image = models.ImageField(upload_to='tickets/', blank=True, null=True)
-    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=model.CASCADE)
-    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-    parent_ticket = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True)
+    image = models.ImageField(upload_to='tickets/', blank=True)
+
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='reported_tickets'
+    )
+
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        blank=True, 
+        null=True, 
+        related_name='assigned_tickets'
+    )
+
+    parent_ticket = models.ForeignKey(
+        'self', 
+        on_delete=models.SET_NULL, 
+        blank=True, 
+        null=True,
+        related_name='sub_tickets'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.status})"
 
 
 class Building(models.Model):
