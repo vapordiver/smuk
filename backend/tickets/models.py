@@ -86,10 +86,11 @@ class AuditLog(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL,
-        null=True
+        null=True,
+        related_name='audit_logs'
     )
 
-    field_changed = models.CharField(mas_length=50)
+    field_changed = models.CharField(max_length=50)
     old_value = models.CharField(max_length=255, null=True, blank=True)
     new_value = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
