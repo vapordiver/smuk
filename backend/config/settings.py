@@ -137,6 +137,20 @@ CORS_ALLOWED_ORIGINS = [
 # Celery
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+CELERY_BEAT_SCHEDULE = {}
+# Celery Beat schedule - TODO: add periodic tasks
+# wrzucic ponizszy import na gore
+# --
+# from celery.schedules import crontab
+# --
+# statyczne narazie, bez django-celery-beat (raczej malo bedzie tych cyklicznych taskow i dlatego tak)
+# example:
+# CELERY_BEAT_SCHEDULE = {
+#     "generate_weekly_report": {
+#         "task": "smuk.tasks.generate_weekly_report",
+#         "schedule": crontab(day_of_week='mon', hour=0, minute=0),
+#     },
+# }
 
 # Media files & AWS S3
 
