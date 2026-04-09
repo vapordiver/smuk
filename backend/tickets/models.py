@@ -6,6 +6,37 @@ from django.core.validators import RegexValidator
 # Create your models here.
 
 # TODO: zarejestrowac apke na koniec!!!
+class FaultCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    icon = models.CharField(max_length=10)
+    color = models.CharField(
+        max_length=7,
+        validators=[
+            RegexValidator(
+                regex='^#[0-9a-fA-F]{6}$',
+                message="Color must be in hex format (e.g. #FFFFFF)",
+                code='invalid_color'
+            )
+        ]
+    )
+
+    class Meta:
+        verbose_name = 'Category'
+        verbose_name_plural = 'Categories'
+
+    def __str__(self):
+        return self.name
+
+
+class Building(models.Model):
+    
+    name = models.CharField(max_length=100)
+    centroid = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
+
+    def __str__(self):
+        return self.name
+
+
 class Ticket(models.Model):
     class Status(models.TextChoices):
         NEW = 'new', 'New'
@@ -23,8 +54,23 @@ class Ticket(models.Model):
 
     title = models.CharField(max_length=20)
     description = models.TextField()
-    # category (fk)
-    # building (fk, nullable)
+    
+    category = models.ForeignKey(
+        'FaultCategory',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='tickets'
+    )
+
+    building = models.ForeignKey(
+        'Building',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='tickets'
+    )
+    
     floor = models.IntegerField(blank=True, null=True)
     room = models.CharField(max_length=20, blank=True)
 
@@ -61,36 +107,6 @@ class Ticket(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.status})"
-
-
-class Building(models.Model):
-    
-    name = models.CharField(max_length=100)
-    centroid = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
-
-    def __str__(self):
-        return self.name
-
-class FaultCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    icon = models.CharField(max_length=10)
-    color = models.CharField(
-        max_length=7,
-        validators=[
-            RegexValidator(
-                regex='^#[0-9a-fA-F]{6}$',
-                message="Color must be in hex format (e.g. #FFFFFF)",
-                code='invalid_color'
-            )
-        ]
-    )
-
-    class Meta:
-        verbose_name = 'Category'
-        verbose_name_plural = 'Categories'
-
-    def __str__(self):
-        return self.name
 
 
 class AuditLog(models.Model):
