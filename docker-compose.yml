@@ -63,10 +63,30 @@ services:
       - ./backend:/app
       - media_data:/app/media
     depends_on:
-      backend:
-        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     entrypoint: /app/entrypoint.sh
     command: celery -A config worker --loglevel=info
+
+  # ──────────────────────────────────────────────
+  # Celery Beat (periodic task scheduler)
+  # ──────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: /app/entrypoint.sh
+    command: celery -A config beat --loglevel=info
 
   # ──────────────────────────────────────────────
   # React Frontend (Vite dev server)
