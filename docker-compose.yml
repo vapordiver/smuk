@@ -62,6 +62,7 @@ services:
     volumes:
       - ./backend:/app
       - media_data:/app/media
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       db:
         condition: service_healthy
@@ -107,3 +108,4 @@ volumes:
   postgres_data:
   redis_data:
   media_data:
+  hf_cache:
