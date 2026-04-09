@@ -27,10 +27,13 @@ class FaultCategory(models.Model):
 
 
 class Building(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
 
     polygon = gis_models.PolygonField(srid=4326, blank=True, null=True)
     centroid = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
+
+    class Meta:
+        ordering = ['name']
 
     def __str__(self):
         return self.name
@@ -56,7 +59,7 @@ class Ticket(models.Model):
     
     category = models.ForeignKey(
         'FaultCategory',
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='tickets'
@@ -64,7 +67,7 @@ class Ticket(models.Model):
 
     building = models.ForeignKey(
         'Building',
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         blank=True,
         null=True,
         related_name='tickets'
@@ -73,8 +76,8 @@ class Ticket(models.Model):
     floor = models.IntegerField(blank=True, null=True)
     room = models.CharField(max_length=20, blank=True)
 
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
-    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.LOW)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW, db_index=True)
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.LOW, db_index=True)
 
     location = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
     image = models.ImageField(upload_to='tickets/', blank=True)
@@ -101,14 +104,22 @@ class Ticket(models.Model):
         related_name='sub_tickets'
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.title} ({self.status})"
 
 
 class AuditLog(models.Model):
+    """
+    Tracks life-cycle changes of Ticket fields. 
+    Log generation should be handled at the View layer 
+    whenever Ticket data is modified.
+    """
     ticket = models.ForeignKey(
         'Ticket',
         on_delete=models.CASCADE,
@@ -128,6 +139,9 @@ class AuditLog(models.Model):
     new_value = models.TextField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.ticket.title} - {self.field_changed} ({self.created_at})"
