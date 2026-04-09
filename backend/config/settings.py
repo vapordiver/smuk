@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.gis",
     "storages",
     "users",
+    "tickets",
 ]
 
 AUTH_USER_MODEL = "users.User"
