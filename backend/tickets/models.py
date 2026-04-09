@@ -77,13 +77,25 @@ class FaultCategory(models.Model):
 
 
 class AuditLog(models.Model):
-    pass
-    # ticket fk
-    # user fk
-    # field_changed
-    # old_value
-    # new_value
-    # created_at
+    ticket = models.ForeignKey(
+        'Ticket',
+        on_delete=models.CASCADE,
+        related_name='audit_logs'
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL,
+        null=True
+    )
+
+    field_changed = models.CharField(mas_length=50)
+    old_value = models.CharField(max_length=255, null=True, blank=True)
+    new_value = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.ticket.title} - {self.field_changed} ({self.created_at})"
 
 
 class Comment(models.Model):
