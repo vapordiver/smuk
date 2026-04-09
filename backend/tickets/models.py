@@ -29,8 +29,9 @@ class FaultCategory(models.Model):
 
 
 class Building(models.Model):
-    
     name = models.CharField(max_length=100)
+    
+    polygon = gis_models.PolygonField(srid=4326, blank=True, null=True)
     centroid = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
 
     def __str__(self):
