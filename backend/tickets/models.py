@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.contrib.gis.db import models as gis_models
+from django.core.validators import RegexValidator
 
 # Create your models here.
 
@@ -71,11 +72,25 @@ class Building(models.Model):
         return self.name
 
 class FaultCategory(models.Model):
-    pass
-    # id
-    # name
-    # icon?
-    # color
+    name = models.CharField(max_length=100, unique=True)
+    icon = models.CharField(max_length=10)
+    color = models.CharField(
+        max_length=7,
+        validators=[
+            RegexValidator(
+                regex='^#[0-9a-fA-F]{6}$',
+                message="Color must be in hex format (e.g. #FFFFFF)",
+                code='invalid_color'
+            )
+        ]
+    )
+
+    class Meta:
+        verbose_name = 'Category'
+        verbose_name_plural = 'Categories'
+
+    def __str__(self):
+        return self.name
 
 
 class AuditLog(models.Model):
