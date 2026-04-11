@@ -23,7 +23,7 @@ export default function StatCard({
   description,
 }) {
   return (
-    <div className="bg-surface border border-outline rounded-xl p-6 shadow-soft transition-all duration-200 hover:shadow-md">
+    <div className="bg-surface border border-outline rounded-xl p-6 shadow-soft transition-all duration-200 hover:shadow-lg hover:bg-surface-container-low hover:border-outline-variant h-full">
       {/* Top row: icon + badge */}
       <div className="flex justify-between items-start mb-4">
         <span className={`material-symbols-outlined text-3xl ${iconColor}`}>

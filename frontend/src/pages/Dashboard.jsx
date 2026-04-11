@@ -132,11 +132,12 @@ export default function Dashboard() {
               </div>
               <Link
                 to="/map"
-                className="absolute bottom-4 right-4 bg-white p-2 rounded-lg shadow-md border border-outline hover:bg-surface-container-low transition-colors"
+                className="absolute bottom-4 right-4 bg-white px-3 py-2 rounded-lg shadow-md border border-outline hover:bg-surface-container-low transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold text-primary"
               >
-                <span className="material-symbols-outlined text-on-surface">
-                  open_in_full
+                <span className="material-symbols-outlined text-base">
+                  open_in_new
                 </span>
+                Otwórz mapę
               </Link>
             </div>
           </div>

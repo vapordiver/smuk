@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom';
 import TopNavBar from './components/layout/TopNavBar';
 import SideNavBar from './components/layout/SideNavBar';
 import Dashboard from './pages/Dashboard';
@@ -17,6 +17,12 @@ import ProfilePage from './pages/ProfilePage';
  */
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Auto-close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location]);
 
   return (
     <div className="min-h-screen bg-background text-on-background antialiased">
@@ -27,7 +33,7 @@ function Layout() {
           onClose={() => setSidebarOpen(false)}
         />
         {/* Main content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <Outlet />
         </div>
       </div>

@@ -14,10 +14,16 @@ export default function CampusMap() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { /* TODO: handle search */ } }}
           />
-          <span className="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant text-lg">
-            search
-          </span>
+          <button
+            type="button"
+            className="absolute right-3 inset-y-0 flex items-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            aria-label="Szukaj"
+            onClick={() => { /* TODO: handle search */ }}
+          >
+            <span className="material-symbols-outlined text-xl">search</span>
+          </button>
         </div>
       </div>
 

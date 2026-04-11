@@ -42,7 +42,7 @@ export default function ImpactButton({
       onClick={onClick}
       className={`
         inline-flex items-center justify-center gap-2
-        rounded-xl font-bold
+        rounded-xl font-bold cursor-pointer
         transition-all duration-200
         hover:scale-[0.98] active:scale-[0.96]
         ${VARIANT_CLASSES[variant] || VARIANT_CLASSES.primary}

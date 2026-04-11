@@ -14,7 +14,7 @@ export default function TopNavBar({ onToggleSidebar }) {
         {/* Sidebar toggle */}
         <button
           onClick={onToggleSidebar}
-          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors"
+          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer"
           aria-label="Toggle menu"
         >
           <span className="material-symbols-outlined">menu</span>
@@ -23,7 +23,7 @@ export default function TopNavBar({ onToggleSidebar }) {
         {/* Brand */}
         <Link
           to="/"
-          className="font-bold tracking-tight text-primary"
+          className="font-bold tracking-tight text-primary leading-none flex items-center"
           style={{ fontSize: 'clamp(1.1rem, 4vw, 1.25rem)' }}
         >
           SMUK
@@ -32,14 +32,21 @@ export default function TopNavBar({ onToggleSidebar }) {
 
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+        <button
+          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer flex items-center justify-center"
+          aria-label="Powiadomienia"
+        >
           <span className="material-symbols-outlined">notifications</span>
         </button>
 
         {/* User avatar */}
-        <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
-          <Link to="/profile" className="material-symbols-outlined">account_circle</Link>
-        </button>
+        <Link
+          to="/profile"
+          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer flex items-center justify-center"
+          aria-label="Profil"
+        >
+          <span className="material-symbols-outlined">account_circle</span>
+        </Link>
       </div>
     </header>
   );

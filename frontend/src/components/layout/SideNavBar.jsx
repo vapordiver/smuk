@@ -113,7 +113,7 @@ export default function SideNavBar({ isOpen, onClose }) {
                 Nowe zgłoszenie
               </ImpactButton>
             </div>
-            <div className="sidebar-cta-icon flex items-center justify-center p-3 rounded-xl bg-primary text-on-primary shadow-lg shadow-primary/20 hover:scale-[0.98] active:scale-[0.96] transition-all duration-200">
+            <div className="sidebar-cta-icon flex items-center justify-center p-3 rounded-xl bg-primary text-on-primary shadow-lg shadow-primary/20 hover:scale-[0.98] active:scale-[0.96] transition-all duration-200 cursor-pointer">
               <span className="material-symbols-outlined">add_circle</span>
             </div>
           </Link>

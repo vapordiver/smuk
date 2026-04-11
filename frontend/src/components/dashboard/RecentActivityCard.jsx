@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
 
 /**
@@ -22,9 +23,12 @@ export default function RecentActivityCard({ items = [] }) {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-bold">Ostatnia aktywność</h3>
-        <button className="text-primary font-semibold text-sm hover:underline">
+        <Link
+          to="/my-tickets"
+          className="text-primary font-semibold text-sm hover:underline cursor-pointer"
+        >
           Zobacz wszystkie
-        </button>
+        </Link>
       </div>
 
       {/* Activity items */}
@@ -32,7 +36,7 @@ export default function RecentActivityCard({ items = [] }) {
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex items-center justify-between p-4 bg-surface-variant border border-outline rounded-xl transition-all duration-200 hover:bg-surface-container-low"
+            className="flex items-center justify-between p-4 bg-surface-variant border border-outline rounded-xl transition-all duration-200 hover:bg-surface-container hover:shadow-md cursor-pointer"
           >
             {/* Left: icon + info */}
             <div className="flex items-center gap-4">
