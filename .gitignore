@@ -14,7 +14,13 @@ media/
 celerybeat-schedule
 celerybeat.pid
 
-# ── Node / Frontend ──────────────────────────
+# ── Python's Virtual Environments ──────────────
+.venv/
+venv/
+env/
+virtualenv/
+
+# ── Node / Frontend ────────────────────────────
 node_modules/
 frontend/dist/
 dist/
