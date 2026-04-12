@@ -13,6 +13,7 @@ class BuildingSerializer(serializers.ModelSerializer):
         """
         Serialize PointField to GeoJSON format
         """
+
         if obj.centroid:
             return {
                 "type": "Point",
