@@ -11,6 +11,8 @@ __pycache__/
 db.sqlite3
 backend/media/
 media/
+celerybeat-schedule
+celerybeat.pid
 
 # ── Node / Frontend ──────────────────────────
 node_modules/
