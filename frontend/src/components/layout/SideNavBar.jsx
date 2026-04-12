@@ -56,7 +56,7 @@ export default function SideNavBar({ isOpen, onClose }) {
       {/* Overlay backdrop — all screen sizes */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/30 z-40"
+          className="fixed top-16 inset-x-0 bottom-0 bg-black/30 z-40"
           onClick={onClose}
         />
       )}

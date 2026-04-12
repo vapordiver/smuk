@@ -1,12 +1,5 @@
 import { Link } from 'react-router-dom';
 
-/**
- * TopNavBar – Minimal global action bar
- * Contains: Logo, Notifications, Profile icon.
- * SearchBar moved to CampusMap page.
- *
- * @param {{ onToggleSidebar: () => void }} props
- */
 export default function TopNavBar({ onToggleSidebar }) {
   return (
     <header className="sticky top-0 z-50 flex justify-between items-center w-full px-6 h-16 bg-white/80 backdrop-blur-md shadow-soft border-b border-outline">
@@ -14,38 +7,41 @@ export default function TopNavBar({ onToggleSidebar }) {
         {/* Sidebar toggle */}
         <button
           onClick={onToggleSidebar}
-          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer"
+          /* Usunięto p-2, dodano w-10 h-10 (Twardy Kwadrat) */
+          className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer shrink-0"
           aria-label="Toggle menu"
         >
-          <span className="material-symbols-outlined">menu</span>
+          {/* Wymuszono sztywne 24px */}
+          <span className="material-symbols-outlined text-[24px]">menu</span>
         </button>
 
         {/* Brand */}
         <Link
           to="/"
-          className="font-bold tracking-tight text-primary leading-none flex items-center"
+          className="font-bold tracking-tight text-primary flex items-center"
           style={{ fontSize: 'clamp(1.1rem, 4vw, 1.25rem)' }}
         >
           SMUK
         </Link>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* --- PRAWA STRONA (Dzwonek + Profil) --- */}
+      <div className="flex items-center gap-2">
         {/* Notifications */}
         <button
-          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer flex items-center justify-center"
+          className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer shrink-0"
           aria-label="Powiadomienia"
         >
-          <span className="material-symbols-outlined">notifications</span>
+          <span className="material-symbols-outlined text-[24px]">notifications</span>
         </button>
 
         {/* User avatar */}
         <Link
           to="/profile"
-          className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer flex items-center justify-center"
+          className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer shrink-0"
           aria-label="Profil"
         >
-          <span className="material-symbols-outlined">account_circle</span>
+          <span className="material-symbols-outlined text-[24px]">account_circle</span>
         </Link>
       </div>
     </header>
