@@ -8,7 +8,7 @@ export default function ProtectedRoute() {
     if (isLoading) {
         return (
             <div className="flex-1 flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined animate-spin text-4x1">progress_activity</span>
+                <span className="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
             </div>
         );
     }
