@@ -7,6 +7,7 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const {login} = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -36,7 +37,8 @@ export default function Login() {
                             <h1 className="text-2xl font-bold tracking-tight text-on-surface">SMUK</h1>
                         </div>
                         <h2 className="text-2xl font-bold text-on-surface text-center mb-4">Zaloguj się</h2>
-                        <p className="text-on-surface-variant text-sm tracking-wide uppercase text-center">System Monitorowania
+                        <p className="text-on-surface-variant text-sm tracking-wide uppercase text-center">System
+                            Monitorowania
                             Usterek Kampusu</p>
                     </div>
                     {/* Login Form Card */}
@@ -91,16 +93,23 @@ export default function Login() {
                                     </div>
                                     <input
                                         id="password"
-                                        type="password"
+                                        type={showPassword ? "text" : "password"}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
-                                        className="w-full pl-11 pr-4 py-3 bg-[#f6f6f8] border-transparent focus:border-primary focus:ring-0 rounded-xl text-on-surface transition-all duration-200 outline-none placeholder:text-on-surface-variant/40"
+                                        className="w-full pl-11 pr-12 py-3 bg-[#f6f6f8] border-transparent focus:border-primary focus:ring-0 rounded-xl text-on-surface transition-all duration-200 outline-none placeholder:text-on-surface-variant/40"
                                         placeholder="••••••••"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                                    >
+                                        <span
+                                            className="material-symbols-outlined text-xl">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                                    </button>
                                 </div>
                             </div>
-
                             {/* Action Button */}
                             <div className="pt-4">
                                 <button

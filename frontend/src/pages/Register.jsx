@@ -8,6 +8,8 @@ export default function Register() {
     });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const {register, login} = useAuth();
     const navigate = useNavigate();
     const handleChange = (e) => {
@@ -16,30 +18,31 @@ export default function Register() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-
         if (formData.password !== formData.password_confirm) {
             return setError('Hasła nie są identyczne');
         }
         setIsLoading(true);
         try {
             await register(formData);
-            //auto login after successful registration
             await login(formData.email, formData.password);
             navigate('/');
         } catch (err) {
             const errorData = err.response?.data;
-            let errorMsg = 'Wystąpił błąd podczas rejestracji.'
+            let errorMessage = 'Wystąpił błąd podczas rejestracji.';
             if (errorData) {
                 if (errorData.error && errorData.error.message) {
-                    errorMsg += ' ' + Object.values(errorData.error.details).flat().join(' ');
+                    errorMessage = errorData.error.message;
+                    if (errorData.error.details) {
+                        errorMessage += ' ' + Object.values(errorData.error.details).flat().join(' ');
+                    }
                 } else if (typeof errorData === 'object') {
                     const messages = Object.values(errorData).flat();
                     if (messages.length > 0) {
-                        errorMsg = messages.join(' ');
+                        errorMessage = messages.join(' ');
                     }
                 }
             }
-            setError(errorMsg);
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -116,6 +119,8 @@ export default function Register() {
                                            placeholder="student@edu.p.lodz.pl"
                                            className="w-full pl-11 pr-4 py-3 bg-[#f6f6f8] border-transparent focus:border-primary focus:ring-0 rounded-xl text-on-surface transition-all duration-200 outline-none placeholder:text-on-surface-variant/40"/>
                                 </div>
+                                <p className="text-[11px] text-on-surface-variant/70 ml-1">Wymagana domena
+                                    @edu.p.lodz.pl lub @p.lodz.pl</p>
                             </div>
                             {/* Password Field */}
                             <div className="space-y-2">
@@ -127,10 +132,25 @@ export default function Register() {
                                         <span
                                             className="material-symbols-outlined text-on-surface-variant text-xl">lock_open</span>
                                     </div>
-                                    <input type="password" name="password" required onChange={handleChange}
-                                           placeholder="••••••••"
-                                           className="w-full pl-11 pr-4 py-3 bg-[#f6f6f8] border-transparent focus:border-primary focus:ring-0 rounded-xl text-on-surface transition-all duration-200 outline-none placeholder:text-on-surface-variant/40"/>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        name="password"
+                                        required
+                                        onChange={handleChange}
+                                        placeholder="••••••••"
+                                        className="w-full pl-11 pr-12 py-3 bg-[#f6f6f8] border-transparent focus:border-primary focus:ring-0 rounded-xl text-on-surface transition-all duration-200 outline-none placeholder:text-on-surface-variant/40"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                                    >
+                                        <span
+                                            className="material-symbols-outlined text-xl">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                                    </button>
                                 </div>
+                                <p className="text-[11px] text-on-surface-variant/70 ml-1">Min. 8 znaków, nie może
+                                    składać się z samych cyfr ani być zbyt popularne.</p>
                             </div>
                             {/* Confirm Password Field */}
                             <div className="space-y-2">
@@ -143,9 +163,22 @@ export default function Register() {
                                         <span
                                             className="material-symbols-outlined text-on-surface-variant text-xl">lock</span>
                                     </div>
-                                    <input type="password" name="password_confirm" required onChange={handleChange}
-                                           placeholder="••••••••"
-                                           className="w-full pl-11 pr-4 py-3 bg-[#f6f6f8] border-transparent focus:border-primary focus:ring-0 rounded-xl text-on-surface transition-all duration-200 outline-none placeholder:text-on-surface-variant/40"/>
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        name="password_confirm"
+                                        required
+                                        onChange={handleChange}
+                                        placeholder="••••••••"
+                                        className="w-full pl-11 pr-12 py-3 bg-[#f6f6f8] border-transparent focus:border-primary focus:ring-0 rounded-xl text-on-surface transition-all duration-200 outline-none placeholder:text-on-surface-variant/40"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                                    >
+                                        <span
+                                            className="material-symbols-outlined text-xl">{showConfirmPassword ? 'visibility_off' : 'visibility'}</span>
+                                    </button>
                                 </div>
                             </div>
                             {/* Action Button */}
