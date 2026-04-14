@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { getRandomDebugLocation, findCampus } from '../../data/campusPolygons';
 
 /**
  * LocationPicker — GPS button with status display.
@@ -10,12 +9,11 @@ import { getRandomDebugLocation, findCampus } from '../../data/campusPolygons';
 export default function LocationPicker({ value, onChange, error }) {
   const [status, setStatus] = useState('idle'); // idle | loading | success | error
   const [errorMsg, setErrorMsg] = useState('');
-  const [campusInfo, setCampusInfo] = useState(null);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      // No Geolocation API — use debug location
-      useDebugFallback('Geolokalizacja nie jest wspierana — użyto lokalizację testową.');
+      setStatus('error');
+      setErrorMsg('Geolokalizacja nie jest wspierana w twojej przeglądarce.');
       return;
     }
 
@@ -28,14 +26,13 @@ export default function LocationPicker({ value, onChange, error }) {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
-        const campus = findCampus(loc.lat, loc.lng);
-        setCampusInfo(campus);
         onChange(loc);
         setStatus('success');
       },
       (err) => {
         console.warn('[LocationPicker] Geolocation error:', err.message);
-        useDebugFallback('Nie udało się pobrać lokalizacji — użyto lokalizację testową.');
+        setStatus('error');
+        setErrorMsg('Nie udało się pobrać lokalizacji GPS. Upewnij się, że udzieliłeś uprawnień.');
       },
       {
         enableHighAccuracy: true,
@@ -45,20 +42,10 @@ export default function LocationPicker({ value, onChange, error }) {
     );
   };
 
-  const useDebugFallback = (message) => {
-    const debugLoc = getRandomDebugLocation();
-    const loc = { lat: debugLoc.lat, lng: debugLoc.lng };
-    onChange(loc);
-    setCampusInfo({ name: debugLoc.campusName });
-    setStatus('success');
-    setErrorMsg(message);
-  };
-
   const handleClear = () => {
     onChange(null);
     setStatus('idle');
     setErrorMsg('');
-    setCampusInfo(null);
   };
 
   const displayError = error && status !== 'success' ? error : '';
@@ -86,11 +73,6 @@ export default function LocationPicker({ value, onChange, error }) {
               <p className="text-xs text-on-surface-variant mt-0.5 font-mono">
                 {value.lat.toFixed(6)}, {value.lng.toFixed(6)}
               </p>
-              {campusInfo && (
-                <span className="inline-flex items-center mt-1.5 px-2 py-0.5 rounded-full bg-secondary/10 text-secondary text-[10px] font-bold tracking-wider uppercase">
-                  {campusInfo.name}
-                </span>
-              )}
               {errorMsg && (
                 <p className="text-[11px] text-on-surface-variant mt-1.5 flex items-center gap-1">
                   <span className="material-symbols-outlined text-xs">info</span>
