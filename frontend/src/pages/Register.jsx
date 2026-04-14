@@ -42,7 +42,8 @@ export default function Register() {
                     }
                 }
             }
-            setError(errorMessage);
+            const formattedErrorMessage = errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1);
+            setError(formattedErrorMessage);
         } finally {
             setIsLoading(false);
         }
