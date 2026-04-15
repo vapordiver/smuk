@@ -1,7 +1,9 @@
 from rest_framework import generics, viewsets
 from rest_framework.filters import OrderingFilter
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import AllowAny
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Building, FaultCategory, Ticket
 from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer
 from .filters import TicketFilter
@@ -33,16 +35,17 @@ class FaultCategoriesListView(generics.ListAPIView):
 
 class TicketViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    `ticket` ViewSet for List or Retrieve
-    GET /api/tickets/      (list)
-    GET /api/tickets/{id}/ (retrieve)
+    `ticket` ViewSet for:
+    `GET /api/tickets/`      (list)
+    `GET /api/tickets/<id>/` (retrieve)
+    `GET /api/tickets/my/`   (get_my_tickets)
     """
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = TicketFilter
     ordering_fields = ['created_at', 'priority', 'status']
 
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action in ['list', 'get_my_tickets']:
             return TicketListSerializer
 
         return TicketDetailSerializer
@@ -54,3 +57,16 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
             return qs
 
         return qs.prefetch_related('audit_logs')
+    
+    @action(detail=False, methods=['get'], url_path='my')
+    def get_my_tickets(self, request):
+        queryset = self.get_queryset().filter(reporter=self.request.user)
+        queryset = self.filter_queryset(queryset)
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True) 
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
