@@ -1,7 +1,10 @@
-from rest_framework import generics
+from rest_framework import generics, viewsets
+from rest_framework.filters import OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import AllowAny
-from .models import Building, FaultCategory
-from .serializers import BuildingSerializer, FaultCategorySerializer
+from .models import Building, FaultCategory, Ticket
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer
+from .filters import TicketFilter
 
 
 class BuildingsListView(generics.ListAPIView):
@@ -28,3 +31,28 @@ class FaultCategoriesListView(generics.ListAPIView):
     authentication_classes = []
     permission_classes = [AllowAny]
     pagination_class = None
+
+
+class TicketViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    `ticket` ViewSet for List or Retrieve
+    GET /api/tickets/      (list)
+    GET /api/tickets/{id}/ (retrieve)
+    """
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_class = TicketFilter
+    ordering_fields = ['created_at', 'priority', 'status']
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return TicketListSerializer
+
+        return TicketDetailSerializer
+
+    def get_queryset(self):
+        qs = Ticket.objects.select_related('reporter', 'category', 'building', 'assigned_to')
+        
+        if self.action == 'list':
+            return qs
+
+        return qs.prefetch_related('audit_logs')
