@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { fetchCategories, fetchBuildings, submitTicket } from '../api/reportService';
+import { fetchCategories, fetchBuildings, submitTicket } from '../services/reportService';
 import CameraCapture from '../components/report/CameraCapture';
 import LocationPicker from '../components/report/LocationPicker';
 import Toast, { useToast } from '../components/common/Toast';
