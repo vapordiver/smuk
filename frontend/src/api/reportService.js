@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import api from '../services/api';
 
 /* ── Mock / fallback data ── */
 
@@ -24,7 +24,7 @@ async function quickFetch(url) {
   const timeoutId = setTimeout(() => controller.abort(), 2000);
 
   try {
-    const { data } = await apiClient.get(url, { signal: controller.signal });
+    const { data } = await api.get(url, { signal: controller.signal });
     return data;
   } finally {
     clearTimeout(timeoutId);
@@ -38,7 +38,7 @@ async function quickFetch(url) {
  */
 export async function fetchCategories() {
   try {
-    const data = await quickFetch('/categories/');
+    const data = await quickFetch('categories/');
     if (Array.isArray(data) && data.length > 0) return data;
     throw new Error('Empty response');
   } catch (err) {
@@ -52,7 +52,7 @@ export async function fetchCategories() {
  */
 export async function fetchBuildings() {
   try {
-    const data = await quickFetch('/buildings/');
+    const data = await quickFetch('buildings/');
     if (Array.isArray(data) && data.length > 0) return data;
     throw new Error('Empty response');
   } catch (err) {
@@ -116,7 +116,7 @@ export async function submitTicket(formData) {
   };
 
   // ── Real implementation (SMUK-13) ──
-  // const { data } = await apiClient.post('/tickets/', formData, {
+  // const { data } = await api.post('/tickets/', formData, {
   //   headers: { 'Content-Type': 'multipart/form-data' },
   // });
   // return data;

@@ -22,7 +22,6 @@ export default function ReportForm() {
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [buildingId, setBuildingId] = useState('');
-  const [floorRoom, setFloorRoom] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState(null);
   const [location, setLocation] = useState(null);
@@ -98,13 +97,6 @@ export default function ReportForm() {
       formData.append('title', title.trim());
       formData.append('category_id', categoryId);
       if (buildingId) formData.append('building_id', buildingId);
-      if (floorRoom.trim()) {
-        // Attempt to parse floor number and room separately
-        const parts = floorRoom.trim().split(/[\/,\s]+/);
-        if (parts[0] && !isNaN(parts[0])) formData.append('floor', parts[0]);
-        if (parts[1]) formData.append('room', parts[1]);
-        else if (parts[0] && isNaN(parts[0])) formData.append('room', parts[0]);
-      }
       formData.append('description', description.trim());
       formData.append('image', image);
       formData.append('latitude', location.lat);
@@ -218,7 +210,6 @@ export default function ReportForm() {
                     className={`w-full h-12 px-4 pr-10 rounded-xl bg-surface-container-low border-2 text-sm text-on-background appearance-none cursor-pointer
                       focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all
                       ${errors.categoryId ? 'border-error' : 'border-outline hover:border-outline-variant'}
-                      ${!categoryId ? 'text-on-surface-variant/50' : ''}
                       disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <option value="">Wybierz kategorię…</option>
@@ -271,7 +262,6 @@ export default function ReportForm() {
                   className={`w-full h-12 px-4 pr-10 rounded-xl bg-surface-container-low border-2 text-sm text-on-background appearance-none cursor-pointer
                     focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all
                     border-outline hover:border-outline-variant
-                    ${!buildingId ? 'text-on-surface-variant/50' : ''}
                     disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <option value="">Wybierz budynek…</option>
@@ -288,24 +278,7 @@ export default function ReportForm() {
             )}
           </div>
 
-          {/* ── Floor / Room ── */}
-          <div>
-            <label htmlFor="report-floor-room" className="block text-sm font-semibold text-on-background mb-1.5">
-              Piętro / Sala
-              <span className="text-on-surface-variant font-normal text-xs ml-1">(opcjonalnie)</span>
-            </label>
-            <input
-              id="report-floor-room"
-              type="text"
-              value={floorRoom}
-              onChange={(e) => setFloorRoom(e.target.value)}
-              placeholder="np. 2/204 lub Parter, sala 101"
-              disabled={submitting}
-              className="w-full h-12 px-4 rounded-xl bg-surface-container-low border-2 border-outline hover:border-outline-variant text-sm text-on-background placeholder:text-on-surface-variant/50
-                focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all
-                disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
+
 
           {/* ── Description ── */}
           <div data-field-error={errors.description ? '' : undefined}>
@@ -327,19 +300,17 @@ export default function ReportForm() {
                 ${errors.description ? 'border-error' : 'border-outline hover:border-outline-variant'}
                 disabled:opacity-50 disabled:cursor-not-allowed`}
             />
-            <div className="flex justify-between mt-1">
-              {errors.description ? (
-                <p className="text-xs text-error flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">warning</span>
-                  {errors.description}
-                </p>
-              ) : (
-                <span />
-              )}
-              <span className={`text-xs ${description.trim().length >= 10 ? 'text-secondary' : 'text-on-surface-variant'}`}>
-                {description.trim().length} / 10 min
-              </span>
-            </div>
+            {errors.description ? (
+              <p className="text-xs text-error flex items-center gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                {errors.description}
+              </p>
+            ) : description.trim().length > 0 && description.trim().length < 10 ? (
+              <p className="text-xs text-on-surface-variant flex items-center gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm">edit_note</span>
+                Jeszcze {10 - description.trim().length} {10 - description.trim().length === 1 ? 'znak' : 'znaki/znaków'}…
+              </p>
+            ) : null}
           </div>
 
           {/* ── Location ── */}
