@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from "../../context/AuthContext";
 
 export default function TopNavBar({ onToggleSidebar }) {
+    const {isAuthenticated, logout} = useAuth();
   return (
     <header className="sticky top-0 z-50 flex justify-between items-center w-full px-6 h-16 bg-white/80 backdrop-blur-md shadow-soft border-b border-outline">
       <div className="flex items-center gap-4">
@@ -34,10 +36,16 @@ export default function TopNavBar({ onToggleSidebar }) {
         >
           <span className="material-symbols-outlined text-[24px]">notifications</span>
         </button>
-
+          {isAuthenticated && (
+              <button onClick={logout}className="w-10 h-10 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-full transition-colors cursor-pointer shrink-0"
+                        aria-label="Wyloguj"
+                        title="Wyloguj się"
+                    >
+                  <span className="material-symbols-outlined text-[24px]">logout</span>
+              </button>
+          )}
         {/* User avatar */}
-        <Link
-          to="/profile"
+        <Link to={isAuthenticated ? "/profile" : "/login"}
           className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer shrink-0"
           aria-label="Profil"
         >

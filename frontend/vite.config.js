@@ -4,13 +4,22 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  //proxy for /api to backend
   server: {
+    //thanks to michal wisniewski now frontend hot reload works (God bless him)
+    watch: {
+      usePolling: true,
+      interval: 1000
+    },
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://backend:8000',
         changeOrigin: true,
-      },
-    },
+      }
+    }
   },
   plugins: [
     react(),
