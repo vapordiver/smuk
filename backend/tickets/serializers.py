@@ -34,10 +34,13 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
     (`AuditLogEntry` in API contract)
     """
     user = UserShortSerializer(read_only=True)
+    
     class Meta:
         model = AuditLog
-        fields = ["id", "user", "field_changed",
-         "old_value", "new_value", "created_at"]
+        fields = [
+            "id", "user", "field_changed",
+            "old_value", "new_value", "created_at"
+        ]
 
 
 class TicketListSerializer(serializers.ModelSerializer):
@@ -50,8 +53,10 @@ class TicketListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ticket
-        fields = ["id", "title", "status", "priority", "category",
-        "building", "reporter", "image", "created_at"]
+        fields = [
+            "id", "title", "status", "priority", "category",
+            "building", "reporter", "image", "created_at"
+        ]
 
 
 class TicketDetailSerializer(serializers.ModelSerializer):
