@@ -1,9 +1,10 @@
 from rest_framework import generics, viewsets
 from rest_framework.filters import OrderingFilter
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
 from .models import Building, FaultCategory, Ticket
 from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer
 from .filters import TicketFilter
@@ -57,6 +58,16 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
             return qs
 
         return qs.prefetch_related('audit_logs')
+
+    def get_permissions(self):
+        # only coordinators
+        if self.action == 'list':
+            return [IsAuthenticated(), IsInCoordinatorGroup()]
+        # ticket detail -> object-level
+        elif self.action == 'retrieve':
+            return [IsAuthenticated(), IsCoordinatorOrOwner()]
+        # /my/ and others -> only auth
+        return [IsAuthenticated()]
     
     @action(detail=False, methods=['get'], url_path='my')
     def get_my_tickets(self, request):
