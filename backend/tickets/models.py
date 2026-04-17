@@ -11,16 +11,16 @@ class FaultCategory(models.Model):
         max_length=7,
         validators=[
             RegexValidator(
-                regex='^#[0-9a-fA-F]{6}$',
+                regex="^#[0-9a-fA-F]{6}$",
                 message="Color must be in hex format (e.g. #FFFFFF)",
-                code='invalid_color'
+                code="invalid_color",
             )
-        ]
+        ],
     )
 
     class Meta:
-        verbose_name = 'Category'
-        verbose_name_plural = 'Categories'
+        verbose_name = "Category"
+        verbose_name_plural = "Categories"
 
     def __str__(self):
         return self.name
@@ -30,10 +30,10 @@ class Building(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
     polygon = gis_models.PolygonField(srid=4326, blank=True, null=True)
-    centroid = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
+    centroid = gis_models.PointField(srid=4326)  # SRID=4326 (WGS84) -> GPS
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
@@ -41,74 +41,78 @@ class Building(models.Model):
 
 class Ticket(models.Model):
     class Status(models.TextChoices):
-        NEW = 'NEW', 'New'
-        IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
-        NEEDS_REVIEW = 'NEEDS_REVIEW', 'Needs Review'
-        RESOLVED = 'RESOLVED', 'Resolved'
-        CLOSED = 'CLOSED', 'Closed'
-        ARCHIVED =  'ARCHIVED', 'Archived'
+        NEW = "NEW", "New"
+        IN_PROGRESS = "IN_PROGRESS", "In Progress"
+        NEEDS_REVIEW = "NEEDS_REVIEW", "Needs Review"
+        RESOLVED = "RESOLVED", "Resolved"
+        CLOSED = "CLOSED", "Closed"
+        ARCHIVED = "ARCHIVED", "Archived"
 
     class Priority(models.TextChoices):
-        LOW = 'LOW', 'Low'
-        MEDIUM = 'MEDIUM', 'Medium'
-        HIGH = 'HIGH', 'High'
-        CRITICAL = 'CRITICAL', 'Critical'
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+        CRITICAL = "CRITICAL", "Critical"
 
     title = models.CharField(max_length=100)
     description = models.TextField()
-    
+
     category = models.ForeignKey(
-        'FaultCategory',
+        "FaultCategory",
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        related_name='tickets'
+        related_name="tickets",
     )
 
     building = models.ForeignKey(
-        'Building',
+        "Building",
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        related_name='tickets'
+        related_name="tickets",
     )
-    
+
     floor = models.IntegerField(blank=True, null=True)
     room = models.CharField(max_length=20, blank=True)
 
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW, db_index=True)
-    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.LOW, db_index=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.NEW, db_index=True
+    )
+    priority = models.CharField(
+        max_length=20, choices=Priority.choices, default=Priority.LOW, db_index=True
+    )
 
-    location = gis_models.PointField(srid=4326) # SRID=4326 (WGS84) -> GPS
-    image = models.ImageField(upload_to='tickets/', blank=True)
+    location = gis_models.PointField(srid=4326)  # SRID=4326 (WGS84) -> GPS
+    image = models.ImageField(upload_to="tickets/", blank=True)
 
     reporter = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='reported_tickets'
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reported_tickets",
     )
 
     assigned_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.SET_NULL, 
-        blank=True, 
-        null=True, 
-        related_name='assigned_tickets'
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="assigned_tickets",
     )
 
     parent_ticket = models.ForeignKey(
-        'self', 
-        on_delete=models.SET_NULL, 
-        blank=True, 
+        "self",
+        on_delete=models.SET_NULL,
+        blank=True,
         null=True,
-        related_name='sub_tickets'
+        related_name="sub_tickets",
     )
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.title} ({self.status})"
@@ -116,21 +120,20 @@ class Ticket(models.Model):
 
 class AuditLog(models.Model):
     """
-    Tracks life-cycle changes of Ticket fields. 
-    Log generation should be handled at the View layer 
+    Tracks life-cycle changes of Ticket fields.
+    Log generation should be handled at the View layer
     whenever Ticket data is modified.
     """
+
     ticket = models.ForeignKey(
-        'Ticket',
-        on_delete=models.CASCADE,
-        related_name='audit_logs'
+        "Ticket", on_delete=models.CASCADE, related_name="audit_logs"
     )
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
-        related_name='audit_logs'
+        related_name="audit_logs",
     )
 
     field_changed = models.CharField(max_length=50)
@@ -141,30 +144,7 @@ class AuditLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.ticket.title} - {self.field_changed} ({self.created_at})"
-
-
-class Comment(models.Model):
-    ticket = models.ForeignKey(
-        'Ticket',
-        on_delete=models.CASCADE,
-        related_name='comments'
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='comments'
-    )
-
-    text = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['created_at']
-
-    def __str__(self):
-        return f"Comment by {self.user} on {self.ticket.title}"[:50]
