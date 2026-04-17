@@ -92,8 +92,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     """
     Serializer used in /api/auth/me/ endpoint.
+    (`UserProfile` in API Contract)
     """
     
     class Meta:
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'role']
+
+class UserShortSerializer(serializers.ModelSerializer):
+    """
+    Serializer used in tickets endpoint listing.
+    (`UserShort` in API Contract) 
+    """
+
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name']
