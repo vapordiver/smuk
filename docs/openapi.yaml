@@ -2,7 +2,7 @@ openapi: "3.0.3"
 
 info:
   title: SMUK API — System Monitorowania Usterek Kampusu
-  version: "1.1.0"
+  version: "1.2.0"
   description: |
     REST API dla systemu zgłaszania i zarządzania usterkami na terenie kampusu uczelni.
 
@@ -14,8 +14,8 @@ info:
     Token uzyskujesz z `POST /api/auth/login/`.
 
     ## Role
-    - **REPORTER** — domyślna rola (studenci, pracownicy). Może zgłaszać usterki i przeglądać swoje.
-    - **COORDINATOR** — zarządza zgłoszeniami, zmienia statusy, widzi panel admina.
+    - **reporter** — domyślna rola (studenci, pracownicy). Może zgłaszać usterki i przeglądać swoje.
+    - **coordinator** — zarządza zgłoszeniami, zmienia statusy, widzi panel admina.
 
 servers:
   - url: http://localhost:8000
@@ -49,7 +49,6 @@ components:
 
   # ─── Wspólne schematy ──────────────────────────────────
   schemas:
-
     # --- Użytkownik ---
     UserShort:
       type: object
@@ -77,7 +76,7 @@ components:
           type: string
         role:
           type: string
-          enum: [REPORTER, COORDINATOR]
+          enum: [reporter, coordinator]
 
     # --- Auth ---
     RegisterRequest:
@@ -157,6 +156,7 @@ components:
 
     # --- Budynek ---
     Building:
+      nullable: true
       type: object
       properties:
         id:
@@ -398,7 +398,6 @@ components:
 # Endpointy
 # ─────────────────────────────────────────────────────────
 paths:
-
   # ═══════════════════════════════════════════════════════
   # AUTH
   # ═══════════════════════════════════════════════════════
@@ -407,7 +406,7 @@ paths:
     post:
       tags: [Auth]
       summary: Rejestracja nowego użytkownika
-      description: Tworzy użytkownika z domyślną rolą REPORTER.
+      description: Tworzy użytkownika z domyślną rolą 'reporter'.
       requestBody:
         required: true
         content:
@@ -510,7 +509,8 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [title, description, category_id, latitude, longitude, image]
+              required:
+                [title, description, category_id, latitude, longitude, image]
               properties:
                 title:
                   type: string
@@ -567,7 +567,7 @@ paths:
     get:
       tags: [Tickets]
       summary: Lista wszystkich zgłoszeń (Koordynator)
-      description: Paginowana lista z filtrami i sortowaniem. Dostępna tylko dla COORDINATOR.
+      description: Paginowana lista z filtrami i sortowaniem. Dostępna tylko dla 'coordinator'.
       security:
         - BearerAuth: []
       parameters:
@@ -658,7 +658,7 @@ paths:
       summary: Edycja zgłoszenia (Koordynator)
       description: |
         Zmiana statusu, priorytetu, przypisanie osoby. Każda zmiana → wpis w AuditLog.
-        Zmiana na RESOLVED wymaga `resolution_note`.
+      #        Zmiana na RESOLVED wymaga `resolution_note`.
       security:
         - BearerAuth: []
       parameters:
@@ -681,14 +681,14 @@ paths:
                   type: string
                   format: uuid
                   nullable: true
-                resolution_note:
-                  type: string
-                  description: Wymagana przy zmianie statusu na RESOLVED
+            #                resolution_note:
+            #                  type: string
+            #                  description: Wymagana przy zmianie statusu na RESOLVED
             example:
-              status: RESOLVED
+              #             status: RESOLVED
               priority: HIGH
-              assigned_to_id: 4
-              resolution_note: "Rura wymieniona, przeciek naprawiony."
+              assigned_to_id: "123e4567-e89b-12d3-a456-426614174000"
+      # resolution_note: "Rura wymieniona, przeciek naprawiony."
       responses:
         "200":
           description: Ticket zaktualizowany
@@ -697,9 +697,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/TicketDetail"
         "400":
-          description: Zmiana na RESOLVED bez resolution_note
+          description: Błąd walidacji danych (np. nieprawidłowy status lub priorytet)
         "403":
           description: Użytkownik nie jest koordynatorem
+        "404":
+          description: Ticket nie istnieje
 
   /api/tickets/my/:
     get:
@@ -713,16 +715,39 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/TicketStatus"
+        - name: priority
+          in: query
+          schema:
+            $ref: "#/components/schemas/TicketPriority"
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: building_id
+          in: query
+          schema:
+            type: integer
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
         - name: ordering
           in: query
           schema:
             type: string
-            enum: [created_at, -created_at, priority, -priority]
+            enum: [created_at, -created_at, priority, -priority, status]
         - name: limit
           in: query
           schema:
             type: integer
             default: 20
+            maximum: 100
         - name: offset
           in: query
           schema:
@@ -797,6 +822,9 @@ paths:
                           $ref: "#/components/schemas/TicketStatus"
                         category:
                           $ref: "#/components/schemas/Category"
+                        distance:
+                          type: number
+                          format: float
                         created_at:
                           type: string
                           format: date-time
@@ -855,81 +883,81 @@ paths:
                     type: string
                     enum: [PENDING]
 
-  /api/tickets/{id}/confirm-resolution/:
-    post:
-      tags: [Tickets]
-      summary: Feedback po rozwiązaniu ticketa
-      description: |
-        Opcjonalny feedback od reportera. Po ustawieniu RESOLVED:
-        - **Potwierdzenie** → status CLOSED
-        - **Uwaga ze zdjęciem** → status NEEDS_REVIEW (koordynator weryfikuje)
-        - **Brak reakcji 3 dni** → automatyczne zamknięcie (CLOSED)
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [confirmed]
-              properties:
-                confirmed:
-                  type: boolean
-            example:
-              confirmed: true
-          multipart/form-data:
-            schema:
-              type: object
-              required: [confirmed, feedback_note, feedback_image]
-              properties:
-                confirmed:
-                  type: boolean
-                  example: false
-                feedback_note:
-                  type: string
-                  description: Opis problemu (wymagany przy confirmed=false)
-                feedback_image:
-                  type: string
-                  format: binary
-                  description: Zdjęcie jako dowód (wymagane przy confirmed=false)
-      responses:
-        "200":
-          description: Feedback zapisany
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                  status:
-                    $ref: "#/components/schemas/TicketStatus"
-                  message:
-                    type: string
-              examples:
-                confirmed:
-                  summary: Potwierdzenie naprawy
-                  value:
-                    id: 42
-                    status: CLOSED
-                    message: Dziękujemy za potwierdzenie naprawy.
-                rejected:
-                  summary: Zgłoszenie uwagi
-                  value:
-                    id: 42
-                    status: NEEDS_REVIEW
-                    message: Twoja uwaga została przekazana koordynatorowi do weryfikacji.
-        "400":
-          description: "Ticket nie ma statusu RESOLVED / brak zdjęcia / minął termin 3 dni"
-        "403":
-          description: Użytkownik nie jest reporterem tego ticketa
+  # /api/tickets/{id}/confirm-resolution/:
+  #   post:
+  #     tags: [Tickets]
+  #     summary: Feedback po rozwiązaniu ticketa
+  #     description: |
+  #       Opcjonalny feedback od reportera. Po ustawieniu RESOLVED:
+  #       - **Potwierdzenie** → status CLOSED
+  #       - **Uwaga ze zdjęciem** → status NEEDS_REVIEW (koordynator weryfikuje)
+  #       - **Brak reakcji 3 dni** → automatyczne zamknięcie (CLOSED)
+  #     security:
+  #       - BearerAuth: []
+  #     parameters:
+  #       - name: id
+  #         in: path
+  #         required: true
+  #         schema:
+  #           type: integer
+  #     requestBody:
+  #       required: true
+  #       content:
+  #         application/json:
+  #           schema:
+  #             type: object
+  #             required: [confirmed]
+  #             properties:
+  #               confirmed:
+  #                 type: boolean
+  #           example:
+  #             confirmed: true
+  #         multipart/form-data:
+  #           schema:
+  #             type: object
+  #             required: [confirmed, feedback_note, feedback_image]
+  #             properties:
+  #               confirmed:
+  #                 type: boolean
+  #                 example: false
+  #               feedback_note:
+  #                 type: string
+  #                 description: Opis problemu (wymagany przy confirmed=false)
+  #               feedback_image:
+  #                 type: string
+  #                 format: binary
+  #                 description: Zdjęcie jako dowód (wymagane przy confirmed=false)
+  #     responses:
+  #       "200":
+  #         description: Feedback zapisany
+  #         content:
+  #           application/json:
+  #             schema:
+  #               type: object
+  #               properties:
+  #                 id:
+  #                   type: integer
+  #                 status:
+  #                   $ref: "#/components/schemas/TicketStatus"
+  #                 message:
+  #                   type: string
+  #             examples:
+  #               confirmed:
+  #                 summary: Potwierdzenie naprawy
+  #                 value:
+  #                   id: 42
+  #                   status: CLOSED
+  #                   message: Dziękujemy za potwierdzenie naprawy.
+  #               rejected:
+  #                 summary: Zgłoszenie uwagi
+  #                 value:
+  #                   id: 42
+  #                   status: NEEDS_REVIEW
+  #                   message: Twoja uwaga została przekazana koordynatorowi do weryfikacji.
+  #       "400":
+  #         description: "Ticket nie ma statusu RESOLVED / brak zdjęcia / minął termin 3 dni"
+  #       "403":
+  #         description: Użytkownik nie jest reporterem tego ticketa
 
   /api/tickets/geojson/:
     get:
@@ -1082,8 +1110,18 @@ paths:
                   $ref: "#/components/schemas/Category"
               example:
                 - { id: 1, name: "Elektryczność", icon: "⚡", color: "#FFC107" }
-                - { id: 2, name: "Ogrzewanie / Wentylacja", icon: "🌡️", color: "#FF5722" }
-                - { id: 3, name: "Instalacja wodna", icon: "💧", color: "#2196F3" }
+                - {
+                    id: 2,
+                    name: "Ogrzewanie / Wentylacja",
+                    icon: "🌡️",
+                    color: "#FF5722",
+                  }
+                - {
+                    id: 3,
+                    name: "Instalacja wodna",
+                    icon: "💧",
+                    color: "#2196F3",
+                  }
 
   # ═══════════════════════════════════════════════════════
   # NOTIFICATIONS
@@ -1241,7 +1279,7 @@ paths:
                           type: string
                         action:
                           type: string
-                          enum: [status_changed, comment_added, ticket_created]
+                          enum: [status_changed, ticket_created]
                         old_value:
                           type: string
                           nullable: true
