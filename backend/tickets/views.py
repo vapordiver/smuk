@@ -12,6 +12,7 @@ class BuildingsListView(generics.ListAPIView):
 
     queryset = Building.objects.all()
     serializer_class = BuildingSerializer
+    authentication_classes = []
     permission_classes = [AllowAny]
     pagination_class = None
 
@@ -24,5 +25,6 @@ class FaultCategoriesListView(generics.ListAPIView):
 
     queryset = FaultCategory.objects.all()
     serializer_class = FaultCategorySerializer
+    authentication_classes = []
     permission_classes = [AllowAny]
     pagination_class = None

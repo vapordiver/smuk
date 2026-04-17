@@ -102,6 +102,18 @@
     background-color: var(--color-outline);
     border-radius: 9999px;
   }
+
+  /* Grey the select box itself while the placeholder is selected,
+     but leave the individual <option> elements fully coloured. */
+  select:has(option[value=""]:checked) {
+    color: var(--color-on-surface-variant);
+  }
+  select option {
+    color: var(--color-on-background);
+  }
+  select option[value=""] {
+    color: var(--color-on-surface-variant);
+  }
 }
 
 /* ── Click-toggle Sidebar ── */
