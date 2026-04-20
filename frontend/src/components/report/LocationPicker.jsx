@@ -6,40 +6,69 @@ import { useGeolocation } from '../../hooks/useGeolocation';
  * Zero external dependencies — OSM tiles are free & public.
  * ───────────────────────────────────────────── */
 
-/**
- * Builds the OSM embed URL for a given center.
- * The user sees a marker and can use the "larger map" link in the iframe.
- *
- * Because OSM embed doesn't support click → coords natively, we overlay a
- * transparent <div> that intercepts pointer events and converts them to
- * [lat, lng] via a simple bounding-box calculation from the displayed extent.
- *
- * @param {{ lat: number, lng: number }} center
- * @param {number} zoom
- */
-function buildOsmUrl(center, zoom = 16) {
-  const { lat, lng } = center;
-  const delta = 0.003; // ~330 m at zoom 16
-  const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
+// Mercator projection math to precisely align custom UI with the iframe tiles.
+function lon2x(lon, zoom) {
+  return ((lon + 180) / 360) * 256 * Math.pow(2, zoom);
+}
+
+function lat2y(lat, zoom) {
+  const latRad = (lat * Math.PI) / 180;
+  return (
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) *
+    256 *
+    Math.pow(2, zoom)
+  );
+}
+
+function x2lon(x, zoom) {
+  return (x / (256 * Math.pow(2, zoom))) * 360 - 180;
+}
+
+function y2lat(y, zoom) {
+  const n = Math.PI - (2 * Math.PI * y) / (256 * Math.pow(2, zoom));
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+/** Builds the OSM embed URL accurately matching the map container size. */
+function buildOsmUrl(center, zoom, width, height) {
+  // Use 80% of width/height to construct a bbox. This guarantees that Leaflet
+  // fitBounds() will compute the exact target `zoom` level and center perfectly.
+  const bboxWidth = width * 0.8;
+  const bboxHeight = height * 0.8;
+
+  const cx = lon2x(center.lng, zoom);
+  const cy = lat2y(center.lat, zoom);
+
+  const minLng = x2lon(cx - bboxWidth / 2, zoom);
+  const maxLng = x2lon(cx + bboxWidth / 2, zoom);
+  // Y axis goes down, so cy - bboxHeight/2 is the NORTH edge (maxLat)
+  const maxLat = y2lat(cy - bboxHeight / 2, zoom);
+  const minLat = y2lat(cy + bboxHeight / 2, zoom);
+
+  const bbox = `${minLng},${minLat},${maxLng},${maxLat}`;
   return (
     `https://www.openstreetmap.org/export/embed.html` +
-    `?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
+    `?bbox=${bbox}&layer=mapnik&marker=${center.lat},${center.lng}`
   );
 }
 
 /** Campus center — fallback starting point for the manual map */
-const CAMPUS_CENTER = { lat: 50.0682, lng: 19.9067 }; // AGH Campus, Kraków
+const CAMPUS_CENTER = { lat: 51.7448, lng: 19.4483 };
+
+const MIN_ZOOM = 13;
+const MAX_ZOOM = 19;
 
 /* ─────────────────────────────────────────────
  * ManualMap sub-component
  * ───────────────────────────────────────────── */
 
 /**
- * Renders an interactive OSM iframe with a draggable crosshair overlay.
- * Clicking the overlay calculates the approximate lat/lng under the cursor
- * based on the rendered iframe bounding box and current viewport extent.
+ * Renders an interactive OSM iframe with zoom controls and a click-to-pick overlay.
  *
- * This approach requires zero map libraries and works in all browsers.
+ * Architecture:
+ *  - The iframe has pointer-events:none so the container div catches all clicks.
+ *  - The map container's onClick calculates lat/lng from click position.
+ *  - Zoom ± buttons call e.stopPropagation() to avoid triggering the pin-drop.
  *
  * @param {{
  *   initialCenter?: { lat: number, lng: number },
@@ -49,38 +78,77 @@ const CAMPUS_CENTER = { lat: 50.0682, lng: 19.9067 }; // AGH Campus, Kraków
  */
 function ManualMap({ initialCenter = CAMPUS_CENTER, onConfirm, onClose }) {
   const [center, setCenter] = useState(initialCenter);
-  const [picked, setPicked] = useState(null); // { lat, lng }
-  const overlayRef = useRef(null);
-
-  // The OSM iframe is re-rendered whenever `center` changes (after confirm-move).
+  const [picked, setPicked] = useState(null);
+  const [zoom, setZoom] = useState(16);
+  const mapRef = useRef(null);
   const [iframeKey, setIframeKey] = useState(0);
 
-  // Displayed viewport extent — matches OSM embed at ~zoom 16
-  const DELTA = 0.003;
+  const [mapDimensions, setMapDimensions] = useState(null);
 
-  const handleOverlayClick = useCallback(
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) {
+        setMapDimensions({ width, height });
+      }
+    });
+    observer.observe(mapRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Click on the map container → calculate lat/lng from cursor position.
+  const handleMapClick = useCallback(
     (e) => {
-      const rect = overlayRef.current?.getBoundingClientRect();
+      if (!mapDimensions) return;
+      const rect = mapRef.current?.getBoundingClientRect();
       if (!rect) return;
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-      const xRatio = (e.clientX - rect.left) / rect.width;
-      const yRatio = (e.clientY - rect.top) / rect.height;
+      const cx = mapDimensions.width / 2;
+      const cy = mapDimensions.height / 2;
 
-      // OSM bbox: [lng_min, lat_min, lng_max, lat_max]
-      const lat = center.lat + DELTA - yRatio * 2 * DELTA;
-      const lng = center.lng - DELTA + xRatio * 2 * DELTA;
+      const centerPxX = lon2x(center.lng, zoom);
+      const centerPxY = lat2y(center.lat, zoom);
 
+      // Pixel coordinate of the click in global map space
+      const clickPxX = centerPxX + (x - cx);
+      const clickPxY = centerPxY + (y - cy);
+
+      const lat = y2lat(clickPxY, zoom);
+      const lng = x2lon(clickPxX, zoom);
+      
       setPicked({ lat, lng });
     },
-    [center],
+    [center, zoom, mapDimensions],
   );
+
+  // Zoom buttons stop propagation so the map click handler isn't triggered.
+  const handleZoomIn = useCallback((e) => {
+    e.stopPropagation();
+    setZoom((z) => {
+      const next = Math.min(MAX_ZOOM, z + 1);
+      if (next !== z) setIframeKey((k) => k + 1);
+      return next;
+    });
+  }, []);
+
+  const handleZoomOut = useCallback((e) => {
+    e.stopPropagation();
+    setZoom((z) => {
+      const next = Math.max(MIN_ZOOM, z - 1);
+      if (next !== z) setIframeKey((k) => k + 1);
+      return next;
+    });
+  }, []);
 
   const handleConfirm = useCallback(() => {
     if (!picked) return;
     onConfirm(picked);
   }, [picked, onConfirm]);
 
-  // When the user confirms, re-center the iframe on the picked point
   const handleMoveCenter = useCallback(() => {
     if (!picked) return;
     setCenter(picked);
@@ -107,43 +175,81 @@ function ManualMap({ initialCenter = CAMPUS_CENTER, onConfirm, onClose }) {
         </button>
       </div>
 
-      {/* Map + overlay */}
-      <div className="relative h-64 sm:h-72 bg-surface-container">
-        {/* OSM iframe */}
-        <iframe
-          key={iframeKey}
-          title="Mapa lokalizacji"
-          src={buildOsmUrl(center)}
-          className="absolute inset-0 w-full h-full border-0 pointer-events-none"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-        />
-
-        {/* Transparent click-capture overlay */}
+      {/* Map container — clips the expanded iframe wrapper to hide native OSM UI */}
+      <div className="relative h-64 sm:h-72 bg-surface-container overflow-hidden rounded-b-xl border-t-0">
+        {/* Iframe & Mapping wrapper — expanded by 80px to push OSM controls out of view */}
         <div
-          ref={overlayRef}
-          onClick={handleOverlayClick}
-          className="absolute inset-0 cursor-crosshair"
-          aria-label="Kliknij aby wybrać lokalizację"
+          ref={mapRef}
+          onClick={handleMapClick}
+          className="absolute cursor-crosshair"
+          title="Kliknij aby wybrać lokalizację"
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') handleOverlayClick(e);
+            if (e.key === 'Enter' || e.key === ' ') handleMapClick(e);
           }}
-        />
+          style={{
+            top: -80,
+            left: -80,
+            width: 'calc(100% + 160px)',
+            height: 'calc(100% + 160px)',
+          }}
+        >
+          {/* OSM iframe — pointer-events-none so the wrapper catches clicks */}
+          {mapDimensions && (
+            <iframe
+              key={iframeKey}
+              title="Mapa lokalizacji"
+              src={buildOsmUrl(center, zoom, mapDimensions.width, mapDimensions.height)}
+              className="absolute inset-0 w-full h-full border-0 pointer-events-none"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )}
 
-        {/* Crosshair at picked point */}
-        {picked && (
-          <CrosshairMarker
-            lat={picked.lat}
-            lng={picked.lng}
-            center={center}
-            delta={DELTA}
-          />
-        )}
+          {/* Crosshair at picked point */}
+          {picked && mapDimensions && (
+            <CrosshairMarker
+              lat={picked.lat}
+              lng={picked.lng}
+              center={center}
+              zoom={zoom}
+              mapDimensions={mapDimensions}
+            />
+          )}
+        </div>
 
-        {/* Corner hint */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-[11px] px-2.5 py-1 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">
+        {/* Zoom controls — stopPropagation prevents triggering the map click */}
+        <div
+          className="absolute bottom-3 right-3 flex flex-col gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            disabled={zoom >= MAX_ZOOM}
+            aria-label="Przybliż"
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-sm shadow-md border border-outline/30
+              text-gray-800 hover:bg-white active:scale-95 transition-all
+              disabled:opacity-40 disabled:cursor-default cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-lg select-none">add</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            disabled={zoom <= MIN_ZOOM}
+            aria-label="Oddal"
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-sm shadow-md border border-outline/30
+              text-gray-800 hover:bg-white active:scale-95 transition-all
+              disabled:opacity-40 disabled:cursor-default cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-lg select-none">remove</span>
+          </button>
+        </div>
+
+        {/* Top hint — pinned to the visible container! */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-[11px] px-3 py-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap z-10 shadow-sm border border-white/10">
           Kliknij mapę, aby wybrać punkt
         </div>
       </div>
@@ -185,15 +291,28 @@ function ManualMap({ initialCenter = CAMPUS_CENTER, onConfirm, onClose }) {
 
 /**
  * Renders an absolute-positioned crosshair pin at the picked lat/lng.
- * Position is derived from the same bbox math used in handleOverlayClick.
+ * Position is derived from the exactly identical Mercator logic.
  */
-function CrosshairMarker({ lat, lng, center, delta }) {
-  const xRatio = (lng - (center.lng - delta)) / (2 * delta);
-  const yRatio = (center.lat + delta - lat) / (2 * delta);
+function CrosshairMarker({ lat, lng, center, zoom, mapDimensions }) {
+  const centerPxX = lon2x(center.lng, zoom);
+  const centerPxY = lat2y(center.lat, zoom);
+
+  const markerPxX = lon2x(lng, zoom);
+  const markerPxY = lat2y(lat, zoom);
+
+  const cx = mapDimensions.width / 2;
+  const cy = mapDimensions.height / 2;
+
+  // Offset from center gives coordinates relative to center, plus cx/cy gives px from top/left.
+  const x = cx + (markerPxX - centerPxX);
+  const y = cy + (markerPxY - centerPxY);
+
+  const rawLeft = (x / mapDimensions.width) * 100;
+  const rawTop = (y / mapDimensions.height) * 100;
 
   // Clamp to [2%, 98%] so the pin stays inside the map area
-  const left = `${Math.min(98, Math.max(2, xRatio * 100)).toFixed(2)}%`;
-  const top = `${Math.min(98, Math.max(2, yRatio * 100)).toFixed(2)}%`;
+  const left = `${Math.min(98, Math.max(2, rawLeft)).toFixed(2)}%`;
+  const top = `${Math.min(98, Math.max(2, rawTop)).toFixed(2)}%`;
 
   return (
     <div
@@ -232,12 +351,19 @@ export default function LocationPicker({ value, onChange, error }) {
 
   const [showManualMap, setShowManualMap] = useState(false);
 
-  // Propagate coords up when GPS succeeds
+  // Keep a stable ref to the latest onChange to avoid the effect firing
+  // on every re-render when the parent passes a new inline function reference.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
+  // Propagate coords up when GPS succeeds — only reacts to actual coords changes.
   useEffect(() => {
     if (coords) {
-      onChange({ lat: coords.lat, lng: coords.lng });
+      onChangeRef.current({ lat: coords.lat, lng: coords.lng });
     }
-  }, [coords, onChange]);
+  }, [coords]);
 
   const handleClear = useCallback(() => {
     clearPosition();
