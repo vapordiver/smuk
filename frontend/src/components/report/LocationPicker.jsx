@@ -3,6 +3,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 
 /** Campus center — fallback starting point for the manual map */
 const CAMPUS_CENTER = { lat: 51.7448, lng: 19.4483 };
@@ -20,68 +21,32 @@ const customIcon = new L.DivIcon({
  * ManualMap sub-component
  * ───────────────────────────────────────────── */
 
+function MapEvents({ setPicked, setZoom }) {
+  useMapEvents({
+    click(e) {
+      setPicked({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+    zoomend(e) {
+      setZoom(e.target.getZoom());
+    },
+  });
+  return null;
+}
+
 function ManualMap({ initialCenter = CAMPUS_CENTER, onConfirm, onClose }) {
   const [picked, setPicked] = useState(null);
   const [zoom, setZoom] = useState(16);
-  const mapContainerRef = useRef(null);
-  const mapRef = useRef(null);
-  const markerRef = useRef(null);
-
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-
-    const map = L.map(mapContainerRef.current, {
-      center: initialCenter,
-      zoom: 16,
-      minZoom: MIN_ZOOM,
-      maxZoom: MAX_ZOOM,
-      zoomControl: false,
-    });
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
-
-    map.on('click', (e) => {
-      setPicked({ lat: e.latlng.lat, lng: e.latlng.lng });
-    });
-
-    map.on('zoomend', () => {
-      setZoom(map.getZoom());
-    });
-
-    mapRef.current = map;
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, [initialCenter]);
-
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    if (picked) {
-      if (!markerRef.current) {
-        markerRef.current = L.marker(picked, { icon: customIcon }).addTo(mapRef.current);
-      } else {
-        markerRef.current.setLatLng(picked);
-      }
-    } else if (markerRef.current) {
-      markerRef.current.remove();
-      markerRef.current = null;
-    }
-  }, [picked]);
+  const [mapObj, setMapObj] = useState(null);
 
   const handleZoomIn = useCallback((e) => {
     e.stopPropagation();
-    if (mapRef.current) mapRef.current.zoomIn();
-  }, []);
+    if (mapObj) mapObj.zoomIn();
+  }, [mapObj]);
 
   const handleZoomOut = useCallback((e) => {
     e.stopPropagation();
-    if (mapRef.current) mapRef.current.zoomOut();
-  }, []);
+    if (mapObj) mapObj.zoomOut();
+  }, [mapObj]);
 
   const handleConfirm = useCallback(() => {
     if (!picked) return;
@@ -89,9 +54,9 @@ function ManualMap({ initialCenter = CAMPUS_CENTER, onConfirm, onClose }) {
   }, [picked, onConfirm]);
 
   const handleMoveCenter = useCallback(() => {
-    if (!picked || !mapRef.current) return;
-    mapRef.current.setView(picked, mapRef.current.getZoom());
-  }, [picked]);
+    if (!picked || !mapObj) return;
+    mapObj.setView(picked, mapObj.getZoom());
+  }, [picked, mapObj]);
 
   return (
     <div className="rounded-xl border-2 border-primary/40 overflow-hidden bg-surface-container-low flex flex-col">
@@ -114,10 +79,22 @@ function ManualMap({ initialCenter = CAMPUS_CENTER, onConfirm, onClose }) {
       </div>
 
       <div className="relative h-64 sm:h-72 bg-surface-container overflow-hidden z-0">
-        <div 
-          ref={mapContainerRef} 
+        <MapContainer
+          center={initialCenter}
+          zoom={16}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
+          zoomControl={false}
           style={{ width: '100%', height: '100%', cursor: 'crosshair', background: '#e5e5e5' }}
-        />
+          ref={setMapObj}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <MapEvents setPicked={setPicked} setZoom={setZoom} />
+          {picked && <Marker position={picked} icon={customIcon} />}
+        </MapContainer>
 
         {/* Zoom controls */}
         <div
