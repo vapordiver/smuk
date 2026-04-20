@@ -20,8 +20,8 @@ function mapGeoError(err) {
           (isIOS()
             ? 'Przejdź do Ustawienia → Prywatność → Usługi lokalizacji i włącz dostęp dla Safari.'
             : isAndroid()
-            ? 'Dotknij ikony kłódki w pasku adresu i zezwól na dostęp do lokalizacji.'
-            : 'Kliknij ikonę kłódki w pasku adresu i zezwól na lokalizację.'),
+              ? 'Dotknij ikony kłódki w pasku adresu i zezwól na dostęp do lokalizacji.'
+              : 'Kliknij ikonę kłódki w pasku adresu i zezwól na lokalizację.'),
         canUseManual: true,
       };
     case 2: // POSITION_UNAVAILABLE
@@ -92,6 +92,7 @@ export function useGeolocation({
   timeout = 10_000,
   maximumAge = 0,
   enableHighAccuracy = true,
+  maxAccuracy = 250, // default to 250m threshold
 } = {}) {
   const [coords, setCoords] = useState(null);
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
@@ -120,6 +121,20 @@ export function useGeolocation({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         if (currentId !== requestIdRef.current) return; // stale
+
+        // Reject locations with huge accuracy radius (e.g. 5000m+ from IP-based fallback)
+        if (maxAccuracy && position.coords.accuracy > maxAccuracy) {
+          console.warn(`[useGeolocation] Rejecting inaccurate location: ±${position.coords.accuracy}m`);
+          setStatus('error');
+          setError(
+            `Lokalizacja zbyt niedokładna (±${Math.round(
+              position.coords.accuracy
+            )}m). Sprawdź sygnał GPS lub wskaż lokację ręcznie.`
+          );
+          setCanUseManual(true);
+          return;
+        }
+
         setCoords({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
