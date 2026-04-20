@@ -117,9 +117,6 @@ export default function ReportForm() {
     }
   };
 
-  /* ── Selected category info ── */
-  const selectedCategory = categories.find((c) => String(c.id) === String(categoryId));
-
   /* ── Skeleton loader for selects ── */
   const SelectSkeleton = () => (
     <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
@@ -182,9 +179,9 @@ export default function ReportForm() {
                 disabled:opacity-50 disabled:cursor-not-allowed`}
             />
             {errors.title && (
-              <p className="text-xs text-error flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
-                {errors.title}
+              <p className="text-xs text-error flex items-start gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
+                <span className="flex-1">{errors.title}</span>
               </p>
             )}
           </div>
@@ -223,23 +220,12 @@ export default function ReportForm() {
                     expand_more
                   </span>
                 </div>
-                {selectedCategory && (
-                  <div className="flex items-center gap-2 mt-2 px-1">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: selectedCategory.color }}
-                    />
-                    <span className="text-xs text-on-surface-variant">
-                      {selectedCategory.icon} {selectedCategory.name}
-                    </span>
-                  </div>
-                )}
               </>
             )}
             {errors.categoryId && (
-              <p className="text-xs text-error flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
-                {errors.categoryId}
+              <p className="text-xs text-error flex items-start gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
+                <span className="flex-1">{errors.categoryId}</span>
               </p>
             )}
           </div>
@@ -301,14 +287,14 @@ export default function ReportForm() {
                 disabled:opacity-50 disabled:cursor-not-allowed`}
             />
             {errors.description ? (
-              <p className="text-xs text-error flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
-                {errors.description}
+              <p className="text-xs text-error flex items-start gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
+                <span className="flex-1">{errors.description}</span>
               </p>
             ) : description.trim().length > 0 && description.trim().length < 10 ? (
-              <p className="text-xs text-on-surface-variant flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">edit_note</span>
-                Jeszcze {10 - description.trim().length} {10 - description.trim().length === 1 ? 'znak' : 'znaki/znaków'}…
+              <p className="text-xs text-on-surface-variant flex items-start gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">edit_note</span>
+                <span className="flex-1">Jeszcze {10 - description.trim().length} {10 - description.trim().length === 1 ? 'znak' : 'znaki/znaków'}…</span>
               </p>
             ) : null}
           </div>

@@ -49,19 +49,19 @@ export default function Toast({ type = 'info', message, visible, onClose, durati
 
   return (
     <div
-      className={`fixed top-4 left-1/2 z-[100] -translate-x-1/2 max-w-[calc(100vw-2rem)] w-auto
+      className={`fixed top-4 left-1/2 z-[100] -translate-x-1/2 w-[calc(100vw-2rem)] sm:w-auto sm:max-w-md
         ${config.bg} ${config.text} px-5 py-3.5 rounded-xl shadow-lg
-        flex items-center gap-3 transition-all duration-300 ease-out
+        flex items-start sm:items-center gap-3 transition-all duration-300 ease-out
         ${show ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}
       role="alert"
     >
       <span
-        className="material-symbols-outlined text-xl shrink-0"
+        className="material-symbols-outlined text-xl shrink-0 mt-0.5 sm:mt-0"
         style={{ fontVariationSettings: "'FILL' 1" }}
       >
         {config.icon}
       </span>
-      <p className="text-sm font-medium leading-snug">{message}</p>
+      <p className="flex-1 text-sm font-medium leading-snug">{message}</p>
       <button
         onClick={() => {
           setShow(false);

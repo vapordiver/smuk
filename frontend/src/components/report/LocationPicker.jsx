@@ -316,7 +316,7 @@ export default function LocationPicker({ value, onChange, error }) {
           {(geoError || displayError) && (
             <p className="text-xs text-error flex items-start gap-1 mt-1">
               <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
-              <span>{geoError || displayError}</span>
+              <span className="flex-1">{geoError || displayError}</span>
             </p>
           )}
 

@@ -18,10 +18,10 @@ function mapGeoError(err) {
         message:
           'Odmówiono dostępu do lokalizacji. ' +
           (isIOS()
-            ? 'Przejdź do Ustawienia → Prywatność → Usługi lokalizacji i włącz dostęp dla Safari.'
+            ? 'Przejdź do Ustawienia → Prywatność → Usługi lokalizacji i włącz dostęp dla Safari lub wskaż na mapie.'
             : isAndroid()
-              ? 'Dotknij ikony kłódki w pasku adresu i zezwól na dostęp do lokalizacji.'
-              : 'Kliknij ikonę kłódki w pasku adresu i zezwól na lokalizację.'),
+              ? 'Dotknij ikony kłódki w pasku adresu i zezwól na dostęp do lokalizacji lub wskaż na mapie.'
+              : 'Kliknij ikonę kłódki w pasku adresu i zezwól na lokalizację lub wskaż na mapie.'),
         canUseManual: true,
       };
     case 2: // POSITION_UNAVAILABLE
@@ -127,9 +127,7 @@ export function useGeolocation({
           console.warn(`[useGeolocation] Rejecting inaccurate location: ±${position.coords.accuracy}m`);
           setStatus('error');
           setError(
-            `Lokalizacja zbyt niedokładna (±${Math.round(
-              position.coords.accuracy
-            )}m). Sprawdź sygnał GPS lub wskaż lokację ręcznie.`
+            `Odmówiono dostępu do lokalizacji. Kliknij ikonę kłódki w pasku adresu i zezwól na lokalizację lub wskaż na mapie.`
           );
           setCanUseManual(true);
           return;

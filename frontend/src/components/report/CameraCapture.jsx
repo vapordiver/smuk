@@ -254,9 +254,9 @@ export default function CameraCapture({ value, onChange, error }) {
 
       {/* Error message */}
       {displayError && !isOpen && (
-        <p className="text-xs text-error flex items-center gap-1 mt-1">
-          <span className="material-symbols-outlined text-sm">warning</span>
-          {displayError}
+        <p className="text-xs text-error flex items-start gap-1 mt-1">
+          <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
+          <span className="flex-1">{displayError}</span>
         </p>
       )}
     </div>
