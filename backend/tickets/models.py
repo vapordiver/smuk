@@ -148,3 +148,17 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.ticket.title} - {self.field_changed} ({self.created_at})"
+
+class Campus(models.Model):
+    """
+    Represents a campus
+    """
+    name = models.CharField(max_length=100, unique=True)
+    polygon = gis_models.PolygonField(srid=4326)
+
+    class Meta:
+        verbose_name = 'Campus'
+        verbose_name_plural = 'Campuses'
+
+    def __str__(self):
+        return self.name
