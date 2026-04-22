@@ -12,6 +12,9 @@ def compress_image_to_webp(imagine_file, max_width=1920, quality=85):
 
     img = Image.open(imagine_file)
     
+    if img.mode in ('RGBA', 'P'):
+        img = img.convert('RGB')
+    
     if img.width > max_width:
         ratio = max_width / img.width
         new_height = int(img.height * ratio)
@@ -23,7 +26,7 @@ def compress_image_to_webp(imagine_file, max_width=1920, quality=85):
 
     return InMemoryUploadedFile(
         file=buffer,
-        field_name=imagine_file.field_name,
+        field_name='image',
         name=imagine_file.name.rsplit(".", 1)[0] + ".webp",
         content_type="image/webp",
         size=sys.getsizeof(buffer),

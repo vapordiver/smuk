@@ -151,10 +151,11 @@ class TicketCreateSerializer(serializers.Serializer):
             try:
                 building = Building.objects.get(pk=building_id)
                 if building.polygon:
-                    # max 300m tolerance
+                    # 300 meters distance is approx 0.0027 degrees of latitude/longitude
+                    # cannot use D(m=300) because it's not supported in this version of postgis
                     is_close = Building.objects.filter(
                         pk=building_id, 
-                        polygon__dwithin=(point, D(m=300))
+                        polygon__dwithin=(point, 0.0027)
                     ).exists()
                     
                     if not is_close:
