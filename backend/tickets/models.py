@@ -1,6 +1,19 @@
 from django.db import models
 from django.conf import settings
 from django.contrib.gis.db import models as gis_models
+from django.utils import timezone
+import uuid
+import os
+
+def ticket_image_upload_path(instance, filename):
+    """
+    generates unique file path for ticket images (local / S3)
+    format: tickets/YYYY/MM/DD/uuid4.webp
+    """
+    ext = filename.split('.')[-1]
+    new_filename = f"{uuid.uuid4().hex}.{ext}"
+    now = timezone.now()
+    return f"tickets/{now.year}/{now.month:02d}/{now.day:02d}/{new_filename}"
 from django.core.validators import RegexValidator
 
 
@@ -84,7 +97,7 @@ class Ticket(models.Model):
     )
 
     location = gis_models.PointField(srid=4326)  # SRID=4326 (WGS84) -> GPS
-    image = models.ImageField(upload_to="tickets/", blank=True)
+    image = models.ImageField(upload_to=ticket_image_upload_path, blank=True)
 
     reporter = models.ForeignKey(
         settings.AUTH_USER_MODEL,
