@@ -1,4 +1,4 @@
-from rest_framework import generics, viewsets
+from rest_framework import generics, viewsets, mixins, status
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
@@ -6,8 +6,9 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
 from .models import Building, FaultCategory, Ticket
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer
 from .filters import TicketFilter
+from .utils import compress_image_to_webp
 
 
 class BuildingsListView(generics.ListAPIView):
@@ -36,12 +37,13 @@ class FaultCategoriesListView(generics.ListAPIView):
     pagination_class = None
 
 
-class TicketViewSet(viewsets.ReadOnlyModelViewSet):
+class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     `ticket` ViewSet for:
     `GET /api/tickets/`      (list)
     `GET /api/tickets/<id>/` (retrieve)
     `GET /api/tickets/my/`   (get_my_tickets)
+    `POST /api/tickets/`     (create)
     """
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = TicketFilter
@@ -50,6 +52,8 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
     def get_serializer_class(self):
         if self.action in ['list', 'get_my_tickets']:
             return TicketListSerializer
+        if self.action == 'create':
+            return TicketCreateSerializer
 
         return TicketDetailSerializer
 
@@ -83,3 +87,26 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        compressed_image = compress_image_to_webp(serializer.validated_data['image'])
+
+        ticket = Ticket.objects.create(
+            title=serializer.validated_data['title'],
+            description=serializer.validated_data['description'],
+            category_id=serializer.validated_data['category_id'],
+            building_id=serializer.validated_data.get('building_id'),
+            #floor=serializer.validated_data.get('floor'),
+            #room=serializer.validated_data.get('room', ''),
+            location=serializer.validated_data['_point'],
+            image=compressed_image,
+            reporter=request.user,
+        )
+
+        output_serializer = TicketDetailSerializer(ticket)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+        
