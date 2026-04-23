@@ -97,7 +97,8 @@ class TicketDetailSerializer(serializers.ModelSerializer):
 
 class TicketCreateSerializer(serializers.Serializer):
     """
-    Serializer used when creating a new ticket
+    Serializer used when creating a new ticket (POST /api/tickets/).
+    Accepts multipart/form-data with image + text fields + GPS coordinates.
     """
     title = serializers.CharField()
     description = serializers.CharField(min_length=10)
@@ -105,9 +106,22 @@ class TicketCreateSerializer(serializers.Serializer):
     building_id = serializers.IntegerField(required=False)
     #floor = serializers.IntegerField(required=False)
     #room = serializers.CharField(required=False)
-    latitude = serializers.FloatField()
-    longitude = serializers.FloatField()
+    latitude = serializers.FloatField(min_value=-90, max_value=90)
+    longitude = serializers.FloatField(min_value=-180, max_value=180)
     image = serializers.ImageField()
+
+    def validate_image(self, value):
+        """
+        Validate image size (max 10MB) and file type (JPEG/PNG only).
+        """
+        if value.size > 10 * 1024 * 1024: # 10MB
+            raise serializers.ValidationError("Image file too large (max 10MB).")
+        
+        allowed_types = ['image/jpeg', 'image/png']
+        if value.content_type not in allowed_types:
+            raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
+        
+        return value
 
     def validate_category_id(self, value):
         """
@@ -127,8 +141,12 @@ class TicketCreateSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         """
-        Validate that location is within campus boundaries.
-        If building provided and validated, check that location is within building boundaries.
+        Cross-field validation:
+        1. Check if GPS location is within any campus polygon (geofencing).
+        2. If building_id provided, check if location is within 300m of the building polygon.
+        
+        Uses PostGIS ST_DWithin with D(m=300) for accurate distance calculation in meters,
+        regardless of latitude (unlike raw degree comparison).
         """
         lat = attrs.get("latitude")
         lng = attrs.get("longitude")
@@ -137,7 +155,7 @@ class TicketCreateSerializer(serializers.Serializer):
 
         point = Point(lng, lat, srid=4326)
         
-        # check if location is within campus boundaries
+        # geofencing: check if location is within campus boundaries
         is_on_campus = Campus.objects.filter(polygon__contains=point).exists()
         
         if not is_on_campus:
@@ -145,17 +163,15 @@ class TicketCreateSerializer(serializers.Serializer):
                 "location": "Location is outside campus boundaries."
             })
         
-        # if building is provided, check if location is within building boundaries (max 300m tolerance)
+        # if building is provided, check proximity (max 300m)
         building_id = attrs.get("building_id")
         if building_id:
             try:
                 building = Building.objects.get(pk=building_id)
                 if building.polygon:
-                    # 300 meters distance is approx 0.0027 degrees of latitude/longitude
-                    # cannot use D(m=300) because it's not supported in this version of postgis
                     is_close = Building.objects.filter(
                         pk=building_id, 
-                        polygon__dwithin=(point, 0.0027)
+                        polygon__dwithin=(point, D(m=300))
                     ).exists()
                     
                     if not is_close:
