@@ -64,7 +64,7 @@ export default function SideNavBar({ isOpen, onClose }) {
       <aside
         className={`
           sidebar-aside
-          fixed left-0 top-16 h-[calc(100vh-4rem)] z-40
+          fixed left-0 top-16 h-[calc(100dvh-4rem)] z-40
           w-64
           flex flex-col py-4 px-2 gap-1
           bg-surface-container-low
@@ -94,7 +94,7 @@ export default function SideNavBar({ isOpen, onClose }) {
         ))}
 
         {/* Bottom section */}
-        <div className="mt-auto flex flex-col gap-2 pb-4">
+        <div className="mt-auto flex flex-col gap-2 pb-8 sm:pb-4">
           {/* Role-based link */}
           {roleLink && (
             <NavLink

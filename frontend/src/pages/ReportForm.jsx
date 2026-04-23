@@ -29,6 +29,24 @@ export default function ReportForm() {
   /* ── Form state ── */
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  
+  const [isMobile, setIsMobile] = useState(true);
+
+  /* ── Mobile Check ── */
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      const isMobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      const hasTouch = (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+      const isMobileWidth = window.innerWidth <= 1024;
+      
+      setIsMobile(isMobileRegex || (hasTouch && isMobileWidth));
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   /* ── Load dictionary data ── */
   useEffect(() => {
@@ -121,6 +139,32 @@ export default function ReportForm() {
   const SelectSkeleton = () => (
     <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
   );
+
+  /* ── Desktop Block Screen ── */
+  if (!isMobile) {
+    return (
+      <main className="flex-1 overflow-y-auto scrollbar-thin bg-surface-container-low flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-surface p-10 rounded-[32px] shadow-xl flex flex-col items-center text-center border border-outline-variant">
+          <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+            <span className="material-symbols-outlined text-5xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+              smartphone
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-on-background mb-4">Tylko dla urządzeń mobilnych</h1>
+          <p className="text-on-surface-variant mb-10 text-sm leading-relaxed">
+            Formularz zgłaszania usterek wymaga dostępu do aparatu oraz dokładnej lokalizacji GPS. Aby ułatwić i zautomatyzować ten proces, funkcja ta jest dostępna wyłącznie na smartfonach i tabletach.
+          </p>
+          <Link
+            to="/"
+            className="h-14 px-8 rounded-xl bg-primary text-on-primary font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:scale-[0.98] transition-all flex items-center justify-center gap-2 w-full"
+          >
+            <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+            Wróć do strony głównej
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <>
