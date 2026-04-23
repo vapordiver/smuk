@@ -52,13 +52,26 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
     def handle_exception(self, exc):
         response = super().handle_exception(exc)
         if isinstance(response.data, dict) and "error" not in response.data:
-            response.data = {
-                "error": {
-                    "code": "VALIDATION_ERROR",
-                    "message": "Validation failed.",
-                    "details": response.data
-                }
+            code_map = {
+                400: "VALIDATION_ERROR",
+                401: "AUTHENTICATION_ERROR",
+                403: "PERMISSION_DENIED",
+                404: "NOT_FOUND",
+                429: "RATE_LIMIT_EXCEEDED",
             }
+            error_code = code_map.get(response.status_code, "ERROR")
+
+            if "detail" in response.data:
+                message = str(response.data["detail"])
+                details = None
+            else:
+                message = "Validation failed."
+                details = response.data
+
+            body = {"code": error_code, "message": message}
+            if details:
+                body["details"] = details
+            response.data = {"error": body}
         return response
 
     def get_serializer_class(self):
