@@ -100,7 +100,7 @@ class TicketCreateSerializer(serializers.Serializer):
     Serializer used when creating a new ticket (POST /api/tickets/).
     Accepts multipart/form-data with image + text fields + GPS coordinates.
     """
-    title = serializers.CharField()
+    title = serializers.CharField(max_length=100)
     description = serializers.CharField(min_length=10)
     category_id = serializers.IntegerField()
     building_id = serializers.IntegerField(required=False)
