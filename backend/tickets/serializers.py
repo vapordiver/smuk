@@ -171,7 +171,7 @@ class TicketCreateSerializer(serializers.Serializer):
                 if building.polygon:
                     is_close = Building.objects.filter(
                         pk=building_id, 
-                        polygon__dwithin=(point, D(m=300))
+                        polygon__distance_lte=(point, D(m=300))
                     ).exists()
                     
                     if not is_close:
