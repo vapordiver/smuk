@@ -206,6 +206,7 @@ export default function ReportForm() {
           <div data-field-error={errors.title ? '' : undefined}>
             <label htmlFor="report-title" className="block text-sm font-semibold text-on-background mb-1.5">
               Tytuł zgłoszenia <span className="text-error">*</span>
+              <span className="text-on-surface-variant font-normal text-xs ml-1">(min. 5 znaków)</span>
             </label>
             <input
               id="report-title"
@@ -314,6 +315,7 @@ export default function ReportForm() {
           <div data-field-error={errors.description ? '' : undefined}>
             <label htmlFor="report-description" className="block text-sm font-semibold text-on-background mb-1.5">
               Opis usterki <span className="text-error">*</span>
+              <span className="text-on-surface-variant font-normal text-xs ml-1">(min. 10 znaków)</span>
             </label>
             <textarea
               id="report-description"
@@ -323,24 +325,19 @@ export default function ReportForm() {
                 if (e.target.value.trim().length >= 10) setErrors((prev) => ({ ...prev, description: undefined }));
               }}
               rows={4}
-              placeholder="Opisz problem szczegółowo (min. 10 znaków)…"
+              placeholder="Opisz problem szczegółowo…"
               disabled={submitting}
               className={`w-full px-4 py-3 rounded-xl bg-surface-container-low border-2 text-sm text-on-background placeholder:text-on-surface-variant/50 resize-y min-h-[100px]
                 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all
                 ${errors.description ? 'border-error' : 'border-outline hover:border-outline-variant'}
                 disabled:opacity-50 disabled:cursor-not-allowed`}
             />
-            {errors.description ? (
+            {errors.description && (
               <p className="text-xs text-error flex items-start gap-1 mt-1">
                 <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
                 <span className="flex-1">{errors.description}</span>
               </p>
-            ) : description.trim().length > 0 && description.trim().length < 10 ? (
-              <p className="text-xs text-on-surface-variant flex items-start gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">edit_note</span>
-                <span className="flex-1">Jeszcze {10 - description.trim().length} {10 - description.trim().length === 1 ? 'znak' : 'znaki/znaków'}…</span>
-              </p>
-            ) : null}
+            )}
           </div>
 
           {/* ── Location ── */}
