@@ -173,11 +173,16 @@ class TicketCreateSerializer(serializers.Serializer):
                         pk=building_id, 
                         polygon__distance_lte=(point, D(m=300))
                     ).exists()
+                else:
+                    is_close = Building.objects.filter(
+                        pk=building_id,
+                        centroid__distance_lte=(point, D(m=300))
+                    ).exists()
                     
-                    if not is_close:
-                        raise serializers.ValidationError({
-                            "location": "Location is too far from selected building (max 300m)."
-                        })
+                if not is_close:
+                    raise serializers.ValidationError({
+                        "location": "Location is too far from selected building (max 300m)."
+                    })
             except Building.DoesNotExist:
                 pass
                 
