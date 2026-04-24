@@ -188,4 +188,4 @@ class TicketCreateSerializer(serializers.Serializer):
                 
         attrs["_point"] = point
 
-        return attrs
+        return attrs

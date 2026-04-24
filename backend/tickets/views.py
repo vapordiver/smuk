@@ -144,4 +144,4 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         )
 
         output_serializer = TicketDetailSerializer(ticket)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)

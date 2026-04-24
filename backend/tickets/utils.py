@@ -35,4 +35,4 @@ def compress_image_to_webp(image_file, max_width=1920, quality=85):
         content_type="image/webp",
         size=buffer.getbuffer().nbytes,
         charset=None,
-    )
+    )
