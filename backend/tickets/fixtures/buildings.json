@@ -1,0 +1,29 @@
+[
+    {
+        "model": "tickets.building",
+        "pk": 1,
+        "fields": {
+            "name": "Instytut Informatyki (C-3)",
+            "centroid": "SRID=4326;POINT(19.4530 51.7530)",
+            "polygon": "SRID=4326;POLYGON((19.4525 51.7527, 19.4535 51.7527, 19.4535 51.7533, 19.4525 51.7533, 19.4525 51.7527))"
+        }
+    },
+    {
+        "model": "tickets.building",
+        "pk": 2,
+        "fields": {
+            "name": "Wydział EEIA (A-10)",
+            "centroid": "SRID=4326;POINT(19.4510 51.7545)",
+            "polygon": "SRID=4326;POLYGON((19.4505 51.7541, 19.4515 51.7541, 19.4515 51.7549, 19.4505 51.7549, 19.4505 51.7541))"
+        }
+    },
+    {
+        "model": "tickets.building",
+        "pk": 3,
+        "fields": {
+            "name": "Centrum Kształcenia Międzynarodowego (A-22)",
+            "centroid": "SRID=4326;POINT(19.4540 51.7535)",
+            "polygon": null
+        }
+    }
+]
