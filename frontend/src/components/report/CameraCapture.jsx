@@ -10,6 +10,7 @@ import { useState, useCallback, useRef } from 'react';
  */
 export default function CameraCapture({ value, onChange, error }) {
   const [preview, setPreview] = useState(null);
+  const [showActions, setShowActions] = useState(false);
   const fileInputRef = useRef(null);
 
   /* ── Native file-input change ── */
@@ -19,6 +20,7 @@ export default function CameraCapture({ value, onChange, error }) {
       if (!file) return;
       onChange(file);
       setPreview(URL.createObjectURL(file));
+      setShowActions(false);
     },
     [onChange],
   );
@@ -27,6 +29,7 @@ export default function CameraCapture({ value, onChange, error }) {
   const handleRemove = useCallback(() => {
     onChange(null);
     setPreview(null);
+    setShowActions(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -57,17 +60,20 @@ export default function CameraCapture({ value, onChange, error }) {
 
       {/* ── CASE 1: Photo preview ── */}
       {preview ? (
-        <div className="relative group rounded-xl overflow-hidden border-2 border-outline bg-surface-container-low">
+        <div 
+          className="relative rounded-xl overflow-hidden border-2 border-outline bg-surface-container-low cursor-pointer"
+          onClick={() => setShowActions((prev) => !prev)}
+        >
           <img
             src={preview}
             alt="Podgląd zdjęcia"
             className="w-full h-48 sm:h-56 object-cover"
           />
-          {/* Hover overlay with actions */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
+          {/* Overlay with actions */}
+          <div className={`absolute inset-0 transition-colors flex items-center justify-center gap-3 ${showActions ? 'bg-black/40 opacity-100' : 'bg-black/0 opacity-0 pointer-events-none'}`}>
             <button
               type="button"
-              onClick={handleRetake}
+              onClick={(e) => { e.stopPropagation(); handleRetake(); }}
               className="bg-white/90 text-on-background px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 hover:bg-white transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">photo_camera</span>
@@ -75,7 +81,7 @@ export default function CameraCapture({ value, onChange, error }) {
             </button>
             <button
               type="button"
-              onClick={handleRemove}
+              onClick={(e) => { e.stopPropagation(); handleRemove(); }}
               className="bg-error/90 text-on-error px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 hover:bg-error transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">delete</span>
@@ -83,7 +89,7 @@ export default function CameraCapture({ value, onChange, error }) {
             </button>
           </div>
           {/* File name badge */}
-          <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2.5 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1.5">
+          <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2.5 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1.5 pointer-events-none">
             <span
               className="material-symbols-outlined text-sm"
               style={{ fontVariationSettings: "'FILL' 1" }}
