@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.gis.admin import GISModelAdmin
-from .models import Ticket, Building, FaultCategory, AuditLog
+from .models import Ticket, Building, FaultCategory, AuditLog, Campus
 
 # Custom admin display for 'tickets' app models.
 
@@ -15,6 +15,13 @@ class FaultCategoryAdmin(admin.ModelAdmin):
 class BuildingAdmin(GISModelAdmin):
     list_display = ("name",)
     search_fields = ("id", "name")
+    readonly_fields = ("id",)
+
+
+@admin.register(Campus)
+class CampusAdmin(GISModelAdmin):
+    list_display = ("id", "name")
+    search_fields = ("name",)
     readonly_fields = ("id",)
 
 

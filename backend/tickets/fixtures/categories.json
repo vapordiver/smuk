@@ -1,0 +1,29 @@
+[
+    {
+        "model": "tickets.faultcategory",
+        "pk": 1,
+        "fields": {
+            "name": "Instalacja wodna",
+            "icon": "💧",
+            "color": "#2196F3"
+        }
+    },
+    {
+        "model": "tickets.faultcategory",
+        "pk": 2,
+        "fields": {
+            "name": "Elektryka",
+            "icon": "⚡",
+            "color": "#FFEB3B"
+        }
+    },
+    {
+        "model": "tickets.faultcategory",
+        "pk": 3,
+        "fields": {
+            "name": "Ogrzewanie",
+            "icon": "🔥",
+            "color": "#FF5722"
+        }
+    }
+]

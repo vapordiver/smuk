@@ -53,11 +53,18 @@ export async function fetchCategories() {
 export async function fetchBuildings() {
   try {
     const data = await quickFetch('buildings/');
-    if (Array.isArray(data) && data.length > 0) return data;
+    if (Array.isArray(data) && data.length > 0) {
+      // Natural alphanumeric sort (A-1, A-2, A-10)
+      return data.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+      );
+    }
     throw new Error('Empty response');
   } catch (err) {
     console.warn('[reportService] GET /api/buildings/ failed — using mock data:', err.message);
-    return MOCK_BUILDINGS;
+    return MOCK_BUILDINGS.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
   }
 }
 
