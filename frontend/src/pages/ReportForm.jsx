@@ -29,6 +29,24 @@ export default function ReportForm() {
   /* ── Form state ── */
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  
+  const [isMobile, setIsMobile] = useState(true);
+
+  /* ── Mobile Check ── */
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      const isMobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      const hasTouch = (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+      const isMobileWidth = window.innerWidth <= 1024;
+      
+      setIsMobile(isMobileRegex || (hasTouch && isMobileWidth));
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   /* ── Load dictionary data ── */
   useEffect(() => {
@@ -117,13 +135,36 @@ export default function ReportForm() {
     }
   };
 
-  /* ── Selected category info ── */
-  const selectedCategory = categories.find((c) => String(c.id) === String(categoryId));
-
   /* ── Skeleton loader for selects ── */
   const SelectSkeleton = () => (
     <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
   );
+
+  /* ── Desktop Block Screen ── */
+  if (!isMobile) {
+    return (
+      <main className="flex-1 overflow-y-auto scrollbar-thin bg-surface-container-low flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-surface p-10 rounded-[32px] shadow-xl flex flex-col items-center text-center border border-outline-variant">
+          <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+            <span className="material-symbols-outlined text-5xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+              smartphone
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-on-background mb-4">Tylko dla urządzeń mobilnych</h1>
+          <p className="text-on-surface-variant mb-10 text-sm leading-relaxed">
+            Formularz zgłaszania usterek wymaga dostępu do aparatu oraz dokładnej lokalizacji GPS. Aby ułatwić i zautomatyzować ten proces, funkcja ta jest dostępna wyłącznie na smartfonach i tabletach.
+          </p>
+          <Link
+            to="/"
+            className="h-14 px-8 rounded-xl bg-primary text-on-primary font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:scale-[0.98] transition-all flex items-center justify-center gap-2 w-full"
+          >
+            <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+            Wróć do strony głównej
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <>
@@ -165,6 +206,7 @@ export default function ReportForm() {
           <div data-field-error={errors.title ? '' : undefined}>
             <label htmlFor="report-title" className="block text-sm font-semibold text-on-background mb-1.5">
               Tytuł zgłoszenia <span className="text-error">*</span>
+              <span className="text-on-surface-variant font-normal text-xs ml-1">(min. 5 znaków)</span>
             </label>
             <input
               id="report-title"
@@ -182,9 +224,9 @@ export default function ReportForm() {
                 disabled:opacity-50 disabled:cursor-not-allowed`}
             />
             {errors.title && (
-              <p className="text-xs text-error flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
-                {errors.title}
+              <p className="text-xs text-error flex items-start gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
+                <span className="flex-1">{errors.title}</span>
               </p>
             )}
           </div>
@@ -223,23 +265,12 @@ export default function ReportForm() {
                     expand_more
                   </span>
                 </div>
-                {selectedCategory && (
-                  <div className="flex items-center gap-2 mt-2 px-1">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: selectedCategory.color }}
-                    />
-                    <span className="text-xs text-on-surface-variant">
-                      {selectedCategory.icon} {selectedCategory.name}
-                    </span>
-                  </div>
-                )}
               </>
             )}
             {errors.categoryId && (
-              <p className="text-xs text-error flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
-                {errors.categoryId}
+              <p className="text-xs text-error flex items-start gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
+                <span className="flex-1">{errors.categoryId}</span>
               </p>
             )}
           </div>
@@ -284,6 +315,7 @@ export default function ReportForm() {
           <div data-field-error={errors.description ? '' : undefined}>
             <label htmlFor="report-description" className="block text-sm font-semibold text-on-background mb-1.5">
               Opis usterki <span className="text-error">*</span>
+              <span className="text-on-surface-variant font-normal text-xs ml-1">(min. 10 znaków)</span>
             </label>
             <textarea
               id="report-description"
@@ -293,24 +325,19 @@ export default function ReportForm() {
                 if (e.target.value.trim().length >= 10) setErrors((prev) => ({ ...prev, description: undefined }));
               }}
               rows={4}
-              placeholder="Opisz problem szczegółowo (min. 10 znaków)…"
+              placeholder="Opisz problem szczegółowo…"
               disabled={submitting}
               className={`w-full px-4 py-3 rounded-xl bg-surface-container-low border-2 text-sm text-on-background placeholder:text-on-surface-variant/50 resize-y min-h-[100px]
                 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all
                 ${errors.description ? 'border-error' : 'border-outline hover:border-outline-variant'}
                 disabled:opacity-50 disabled:cursor-not-allowed`}
             />
-            {errors.description ? (
-              <p className="text-xs text-error flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
-                {errors.description}
+            {errors.description && (
+              <p className="text-xs text-error flex items-start gap-1 mt-1">
+                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">warning</span>
+                <span className="flex-1">{errors.description}</span>
               </p>
-            ) : description.trim().length > 0 && description.trim().length < 10 ? (
-              <p className="text-xs text-on-surface-variant flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">edit_note</span>
-                Jeszcze {10 - description.trim().length} {10 - description.trim().length === 1 ? 'znak' : 'znaki/znaków'}…
-              </p>
-            ) : null}
+            )}
           </div>
 
           {/* ── Location ── */}
