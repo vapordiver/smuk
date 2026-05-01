@@ -1,9 +1,11 @@
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useMemo} from 'react';
 import {MapContainer, TileLayer, Marker} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from '../services/api';
 import StatusBadge from '../components/common/StatusBadge';
+
+// leaflet icon fix
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -22,212 +24,306 @@ const mapStatusToBadge = (apiStatus) => {
         'NEEDS_REVIEW': 'in-progress',
         'RESOLVED': 'resolved',
         'CLOSED': 'resolved',
-        'ARCHIVED': 'resolved',
+        'ARCHIVED': 'rejected',
     };
     return statusMap[apiStatus] || 'new';
 };
 
-const mapPriorityToLabel = (priority) => {
-    const priorityMap = {
-        'LOW': 'Niski',
-        'MEDIUM': 'Średni',
-        'HIGH': 'Wysoki',
-        'CRITICAL': 'Krytyczny',
-    };
-    return priorityMap[priority] || priority;
-};
-
 const formatDate = (isoString) => {
-  if (!isoString) return '';
-  return new Date(isoString).toLocaleDateString('pl-PL', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+    if (!isoString) return '—';
+    return new Date(isoString).toLocaleDateString('pl-PL', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 };
 
-const TicketCard = ({ ticket, onClick }) => {
-  return (
-    <div
-      onClick={() => onClick(ticket)}
-      className="bg-white p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow cursor-pointer flex gap-4"
-    >
-      {/* Thumbnail */}
-      <div className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-gray-100">
-        {ticket.image ? (
-          <img
-            src={ticket.image}
-            alt={ticket.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-            Brak zdj.
-          </div>
-        )}
-      </div>
+//ticket card display
+const TicketCard = ({ticket, onClick}) => {
+    const statusType = mapStatusToBadge(ticket.status);
 
-      {/* Info */}
-      <div className="flex flex-col flex-1 justify-between py-1">
-        <div>
-          <div className="flex justify-between items-start mb-1">
-            <h3 className="font-semibold text-gray-800 line-clamp-1">{ticket.title}</h3>
-            <StatusBadge status={mapStatusToBadge(ticket.status)} />
-          </div>
-          <p className="text-xs text-gray-500 font-medium">
-            Priorytet: <span className="text-gray-700">{mapPriorityToLabel(ticket.priority)}</span>
-            {ticket.category?.name && ` • ${ticket.category.name}`}
-          </p>
-        </div>
-        <div className="text-[11px] text-gray-400">
-          Zgłoszono: {formatDate(ticket.created_at)}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TicketModal = ({ ticket, onClose }) => {
-  if (!ticket) return null;
-
-  const position = ticket.location?.coordinates
-    ? [ticket.location.coordinates[1], ticket.location.coordinates[0]] // [lat, lng] wg PostGIS [lng, lat]
-    :[51.764, 19.511]; //fallback na stadion widzew xd
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose}></div>
-      <div className="relative bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-        <div className="flex justify-between items-center p-6 pb-4">
-          <h2 className="text-xl font-bold text-gray-800">{ticket.title}</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-600 hover:bg-gray-200 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="p-6 pt-0 overflow-y-auto space-y-6">
-          <div className="flex gap-2">
-            <StatusBadge status={mapStatusToBadge(ticket.status)} />
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-gray-100 text-gray-600">
-              {mapPriorityToLabel(ticket.priority)}
-            </span>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-gray-800 mb-1">Opis usterki</h4>
-            <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
-              {ticket.description || 'Brak opisu.'}
-            </p>
-          </div>
-          {ticket.image && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-800 mb-2">Zdjęcie</h4>
-              <img
-                src={ticket.image}
-                alt="Pełny podgląd usterki"
-                className="w-full h-auto rounded-2xl bg-gray-50 object-cover max-h-[40vh]"
-              />
+    return (
+        <div
+            className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row h-full cursor-pointer"
+            onClick={() => onClick(ticket)}>
+            {/* image section */}
+            <div className="md:w-1/3 relative h-48 md:h-auto overflow-hidden bg-slate-100">
+                {ticket.image ? (
+                    <img
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        src={ticket.image}
+                        alt={ticket.title}
+                    />
+                ) : (
+                    <div
+                        className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">Brak
+                        zdjęcia</div>
+                )}
+                <div className="absolute top-4 left-4">
+                    <StatusBadge status={statusType}/>
+                </div>
             </div>
-          )}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-800 mb-2">Lokalizacja</h4>
-            <div className="h-48 w-full rounded-2xl overflow-hidden shadow-sm">
-              <MapContainer
-                center={position}
-                zoom={16}
-                className="h-full w-full"
-                scrollWheelZoom={false}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker position={position} />
-              </MapContainer>
-            </div>
-            {ticket.building?.name && (
-              <p className="text-xs text-gray-500 mt-2">
-                Przypisano do: {ticket.building.name}
-                {ticket.room ? `, sala ${ticket.room}` : ''}
-              </p>
-            )}
-          </div>
+            {/* ticket main body section */}
+            <div className="md:w-2/3 p-6 flex flex-col justify-between">
+                <div>
+                    <div className="flex justify-between items-start mb-2">
+                        <span
+                            className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">ID: #REP-{ticket.id}</span>
+                        <span className="text-xs text-slate-500 font-medium">{formatDate(ticket.created_at)}</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-primary transition-colors">{ticket.title}</h3>
+                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-4">
+                        <span className="material-symbols-outlined text-lg">location_on</span>
+                        <span>
+                            {ticket.building?.name || "Teren kampusu"}
+                            {ticket.floor ? ` Piętro: ${ticket.floor}` : ''}
+                            {ticket.room ? ` Sala: ${ticket.room}` : ''}
+                        </span>
+                    </div>
+                </div>
 
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                        <span
+                            className={`w-2 h-2 rounded-full ${statusType === 'resolved' ? 'bg-secondary' : 'bg-primary animate-pulse'}`}></span>
+                        <span
+                            className="text-xs font-semibold text-slate-600 capitalize">{ticket.status.toLowerCase().replace('_', ' ')}</span>
+                    </div>
+                    <button
+                        className="text-primary font-bold text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                        Zobacz szczegóły <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
+
+const TicketModal = ({ticket, onClose}) => {
+    if (!ticket) return null;
+    // Leaflet expects [lat, lng] - coordinates from DB are [lng, lat]
+    const position = ticket.location?.coordinates
+        ? [ticket.location.coordinates[1], ticket.location.coordinates[0]]
+        : [51.7535, 19.4520];
+    const hasAuditLog = ticket.audit_log && ticket.audit_log.length > 0;
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+            <div className="absolute inset-0" onClick={onClose}/>
+            <div
+                className="relative bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
+                {/* Header */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-900">{ticket.title}</h2>
+                        <p className="text-sm text-slate-500 mt-1">#REP-{ticket.id}</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full transition-colors text-xl"
+                    >
+                        ✕
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                    {/* Status and Priority */}
+                    <div className="flex flex-wrap gap-3">
+                        <StatusBadge status={mapStatusToBadge(ticket.status)}/>
+                        {ticket.priority && (
+                            <div
+                                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
+                                    ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL'
+                                        ? 'bg-red-100 text-red-700 border-red-200'
+                                        : ticket.priority === 'MEDIUM'
+                                            ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                            : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                }`}>
+                                Priorytet: {ticket.priority}
+                            </div>
+                        )}
+                    </div>
+                    {/* Description */}
+                    <div>
+                        <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined">description</span>
+                            Opis problemu
+                        </h4>
+                        <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">
+                            {ticket.description || "Brak opisu."}
+                        </p>
+                    </div>
+
+                    {/* Image */}
+                    {ticket.image && (
+                        <div>
+                            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                <span className="material-symbols-outlined">photo_camera</span>
+                                Zdjęcie usterki
+                            </h4>
+                            <img
+                                src={ticket.image}
+                                alt={ticket.title}
+                                className="w-full rounded-2xl border border-slate-200"
+                            />
+                        </div>
+                    )}
+                    {/* Location */}
+                    <div>
+                        <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined">location_on</span>
+                            Lokalizacja
+                        </h4>
+                        <div className="text-slate-600 space-y-1">
+                            <p><strong>Budynek:</strong> {ticket.building?.name || "Okolice kampusu"}</p>
+                            {ticket.floor && <p><strong>Piętro:</strong> {ticket.floor}</p>}
+                            {ticket.room && <p><strong>Pokój:</strong> {ticket.room}</p>}
+                        </div>
+                    </div>
+                    {/* Map */}
+                    <div>
+                        <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <span className="material-symbols-outlined">map</span>
+                            Lokalizacja na mapie
+                        </h4>
+                        <div className="h-80 rounded-2xl overflow-hidden border border-slate-200">
+                            <MapContainer
+                                center={position}
+                                zoom={17}
+                                className="h-full w-full"
+                                scrollWheelZoom={false}
+                            >
+                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                                <Marker position={position}/>
+                            </MapContainer>
+                        </div>
+                    </div>
+                    {hasAuditLog && (
+                        <div>
+                            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                <span className="material-symbols-outlined">history</span>
+                                Historia zmian
+                            </h4>
+                            <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+                                {ticket.audit_log.map((entry, idx) => (
+                                    <div key={entry.id || idx}
+                                         className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
+                                        <div className="text-slate-400 whitespace-nowrap">
+                                            {formatDate(entry.created_at)}
+                                        </div>
+                                        <div>
+                                            <span className="font-medium text-slate-700">
+                                                {entry.user?.first_name} {entry.user?.last_name}
+                                            </span>
+                                            <span className="text-slate-500"> zmienił(a) </span>
+                                            <span className="font-medium">"{entry.field_changed}"</span>
+                                            <div className="text-slate-500 mt-0.5">
+                                                z <span className="line-through">{entry.old_value}</span> na{' '}
+                                                <span className="font-medium text-emerald-600">{entry.new_value}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {/* Footer */}
+                    <div className="pt-4 border-t border-slate-100 text-xs text-slate-500">
+                        Utworzono: {formatDate(ticket.created_at)}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// main page
 
 export default function MyTickets() {
-  const [tickets, setTickets] = useState([]);
-  const[isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedTicket, setSelectedTicket] = useState(null);
+    const [tickets, setTickets] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('Wszystkie');
+    const [selectedTicket, setSelectedTicket] = useState(null);
 
-  useEffect(() => {
-    const fetchTickets = async () => {
-      try {
-        setIsLoading(true);
-        // pobieranie zgloszen
-        const response = await api.get('tickets/my/');
-        // Obsługa paginacji response.data.results
-        const results = response.data.results || response.data;
-        setTickets(results);
-      } catch (err) {
-        console.error('Błąd pobierania zgłoszeń:', err);
-        setError('Nie udało się pobrać Twoich zgłoszeń. Spróbuj ponownie.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchTickets();
-  },[]);
-  return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto min-h-screen">
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight text-center">
-          Moje Zgłoszenia
-        </h1>
-        <p className="text-gray-500 text-sm mt-1 text-center">
-          Śledź statusy zgłoszonych przez Ciebie usterek.
-        </p>
-      </div>
-      {isLoading ? (
-        <div className="flex flex-col gap-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="animate-pulse bg-white p-4 rounded-2xl h-32 w-full"></div>
-          ))}
+    useEffect(() => {
+        api.get('tickets/my/').then(res => {
+            setTickets(res.data.results || []);
+            setIsLoading(false);
+        }).catch(() => setIsLoading(false));
+    }, []);
+
+    // Filter logic
+    const filteredTickets = useMemo(() => {
+        if (activeTab === 'Wszystkie') return tickets;
+        if (activeTab === 'Oczekujące') return tickets.filter(t => t.status === 'NEW');
+        if (activeTab === 'W trakcie') return tickets.filter(t => ['IN_PROGRESS', 'NEEDS_REVIEW'].includes(t.status));
+        if (activeTab === 'Rozwiązane') return tickets.filter(t => ['RESOLVED', 'CLOSED'].includes(t.status));
+        return tickets;
+    }, [tickets, activeTab]);
+
+    // Stats
+    const stats = useMemo(() => ({
+        total: tickets.length,
+        pending: tickets.filter(t => t.status === 'NEW').length,
+        progress: tickets.filter(t => ['IN_PROGRESS', 'NEEDS_REVIEW'].includes(t.status)).length,
+        resolved: tickets.filter(t => ['RESOLVED', 'CLOSED'].includes(t.status)).length,
+    }), [tickets]);
+
+    return (
+        <div className="p-6 md:p-8 max-w-7xl mx-auto min-h-screen font-['Lexend']">
+            <div className="mb-8">
+                <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-6">Moje
+                    zgłoszenia</h2>
+                {/* Tabs */}
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-1">
+                    {['Wszystkie', 'Oczekujące', 'W trakcie', 'Rozwiązane'].map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-6 py-3 font-bold transition-all border-b-2 ${
+                                activeTab === tab ? 'text-primary border-primary' : 'text-slate-500 border-transparent hover:text-primary'
+                            }`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            {/*should ensure same grid width for every option (0 or 2 cards on display) but doesnt work xd*/}
+            {isLoading ? (
+                <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 animate-pulse">
+                    {[1, 2, 3, 4].map(i => <div key={i}
+                                                className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
+                </div>
+            ) : filteredTickets.length === 0 ? (
+                <div className="w-full flex flex-col items-center justify-center py-24 text-slate-400">
+                    <span className="material-symbols-outlined text-6xl mb-4">inbox</span>
+                    <p className="text-lg font-semibold">Brak zgłoszeń</p>
+                    <p className="text-sm mt-1">Nie masz jeszcze żadnych zgłoszeń w tej kategorii.</p>
+                </div>
+            ) : (
+                <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {filteredTickets.map(ticket => (
+                        <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
+                    ))}
+                </div>
+            )}
+            <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary"/>
+                <StatItem label="Oczekujące" value={stats.pending} color="text-error"/>
+                <StatItem label="W trakcie" value={stats.progress} color="text-blue-600"/>
+                <StatItem label="Rozwiązane" value={stats.resolved} color="text-secondary"/>
+            </div>
+            <TicketModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)}/>
         </div>
-      ) : error ? (
-        <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-medium">
-          {error}
+    );
+}
+
+function StatItem({label, value, color}) {
+    return (
+        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+            <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+            <p className={`text-3xl font-extrabold ${color}`}>{value}</p>
         </div>
-      ) : tickets.length === 0 ? (
-        <div className="bg-white p-8 rounded-3xl text-center shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-800">Brak zgłoszeń</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Nie zgłosiłeś jeszcze żadnej usterki na kampusie.
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {tickets.map(ticket => (
-            <TicketCard
-              key={ticket.id}
-              ticket={ticket}
-              onClick={setSelectedTicket}
-            />
-          ))}
-        </div>
-      )}
-      <TicketModal
-        ticket={selectedTicket}
-        onClose={() => setSelectedTicket(null)}
-      />
-    </div>
-  );
+    );
 }

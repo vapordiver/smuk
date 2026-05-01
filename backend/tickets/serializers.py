@@ -56,8 +56,8 @@ class TicketListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ticket
         fields = [
-            "id", "title", "status", "priority", "category",
-            "building", "reporter", "image", "created_at"
+            "id", "title", "description", "status", "priority", "category",
+            "building", "reporter", "location", "image", "created_at"
         ]
 
 
@@ -188,4 +188,4 @@ class TicketCreateSerializer(serializers.Serializer):
                 
         attrs["_point"] = point
 
-        return attrs
+        return attrs
