@@ -6,6 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   //proxy for /api to backend
   server: {
+    allowedHosts: ['.ngrok-free.dev'],
     //thanks to michal wisniewski now frontend hot reload works (God bless him)
     watch: {
       usePolling: true,
