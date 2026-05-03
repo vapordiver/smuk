@@ -1,5 +1,6 @@
 import {useState, useEffect, useMemo} from 'react';
 import {MapContainer, TileLayer, Marker} from 'react-leaflet';
+import {useAuth} from "../context/AuthContext";
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from '../services/api';
@@ -29,6 +30,16 @@ const mapStatusToBadge = (apiStatus) => {
     return statusMap[apiStatus] || 'new';
 };
 
+const mapPriorityToPolish = (priority) => {
+    const priorityMap = {
+        'LOW': 'Niski',
+        'MEDIUM': 'Średni',
+        'HIGH': 'Wysoki',
+        'CRITICAL': 'Krytyczny',
+    };
+    return priorityMap[priority] || priority;
+};
+
 const formatDate = (isoString) => {
     if (!isoString) return '—';
     return new Date(isoString).toLocaleDateString('pl-PL', {
@@ -38,6 +49,17 @@ const formatDate = (isoString) => {
         hour: '2-digit',
         minute: '2-digit',
     });
+};
+
+const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.includes('backend:8000')) {
+        return imagePath.replace('backend:8000', 'localhost:8000');
+    }
+    if (imagePath.startsWith('/media/')) {
+        return `http://localhost:8000${imagePath}`;
+    }
+    return imagePath;
 };
 
 //ticket card display
@@ -53,7 +75,7 @@ const TicketCard = ({ticket, onClick}) => {
                 {ticket.image ? (
                     <img
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        src={ticket.image}
+                        src={getImageUrl(ticket.image)}
                         alt={ticket.title}
                     />
                 ) : (
@@ -61,9 +83,6 @@ const TicketCard = ({ticket, onClick}) => {
                         className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">Brak
                         zdjęcia</div>
                 )}
-                <div className="absolute top-4 left-4">
-                    <StatusBadge status={statusType}/>
-                </div>
             </div>
             {/* ticket main body section */}
             <div className="md:w-2/3 p-6 flex flex-col justify-between">
@@ -78,18 +97,13 @@ const TicketCard = ({ticket, onClick}) => {
                         <span className="material-symbols-outlined text-lg">location_on</span>
                         <span>
                             {ticket.building?.name || "Teren kampusu"}
-                            {ticket.floor ? ` Piętro: ${ticket.floor}` : ''}
-                            {ticket.room ? ` Sala: ${ticket.room}` : ''}
                         </span>
                     </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                     <div className="flex items-center gap-2">
-                        <span
-                            className={`w-2 h-2 rounded-full ${statusType === 'resolved' ? 'bg-secondary' : 'bg-primary animate-pulse'}`}></span>
-                        <span
-                            className="text-xs font-semibold text-slate-600 capitalize">{ticket.status.toLowerCase().replace('_', ' ')}</span>
+                        <StatusBadge status={mapStatusToBadge(ticket.status)} />
                     </div>
                     <button
                         className="text-primary font-bold text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
@@ -139,9 +153,17 @@ const TicketModal = ({ticket, onClose}) => {
                                             ? 'bg-orange-100 text-orange-700 border-orange-200'
                                             : 'bg-emerald-100 text-emerald-700 border-emerald-200'
                                 }`}>
-                                Priorytet: {ticket.priority}
+                                Priorytet: {mapPriorityToPolish(ticket.priority)}
                             </div>
                         )}
+                    </div>
+                    {/* Category */}
+                    <div>
+                        <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2"><span
+                            className="material-symbols-outlined">category</span>Kategoria</h4>
+                        <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">
+                            {ticket.category?.name || "Brak kategorii"}
+                        </p>
                     </div>
                     {/* Description */}
                     <div>
@@ -162,9 +184,9 @@ const TicketModal = ({ticket, onClose}) => {
                                 Zdjęcie usterki
                             </h4>
                             <img
-                                src={ticket.image}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                src={getImageUrl(ticket.image)}
                                 alt={ticket.title}
-                                className="w-full rounded-2xl border border-slate-200"
                             />
                         </div>
                     )}
@@ -240,17 +262,27 @@ const TicketModal = ({ticket, onClose}) => {
 // main page
 
 export default function MyTickets() {
+    const {user} = useAuth();
     const [tickets, setTickets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Wszystkie');
     const [selectedTicket, setSelectedTicket] = useState(null);
 
+    const isCoordinator = user?.role?.toLowerCase() === "coordinator";
+
     useEffect(() => {
-        api.get('tickets/my/').then(res => {
-            setTickets(res.data.results || []);
+        if (!user){
+            return;
+        }
+        const endpoint = isCoordinator ? 'tickets/' : 'tickets/my/';
+        api.get(endpoint).then(res => {
+            setTickets(res.data.results ||[]);
             setIsLoading(false);
-        }).catch(() => setIsLoading(false));
-    }, []);
+        }).catch(err => {
+            console.error("Błąd pobierania zgłoszeń:", err);
+            setIsLoading(false);
+        });
+    }, [user, isCoordinator]);
 
     // Filter logic
     const filteredTickets = useMemo(() => {
@@ -270,11 +302,14 @@ export default function MyTickets() {
     }), [tickets]);
 
     return (
-        <div className="p-6 md:p-8 max-w-7xl mx-auto min-h-screen font-['Lexend']">
+        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto min-h-screen font-['Lexend']">
             <div className="mb-8">
-                <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-6">Moje
-                    zgłoszenia</h2>
-                {/* Tabs */}
+                <p className="text-primary text-xl font-bold text-slate-900 mb-2">
+                    {isCoordinator ? "Panel Koordynatora" : "Podsumowanie konta"}
+                </p>
+                <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-6">
+                    {isCoordinator ? "Wszystkie zgłoszenia w systemie" : "Moje zgłoszenia"}
+                </h2>
                 <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-1">
                     {['Wszystkie', 'Oczekujące', 'W trakcie', 'Rozwiązane'].map(tab => (
                         <button
@@ -289,25 +324,29 @@ export default function MyTickets() {
                     ))}
                 </div>
             </div>
-            {/*should ensure same grid width for every option (0 or 2 cards on display) but doesnt work xd*/}
-            {isLoading ? (
-                <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 animate-pulse">
-                    {[1, 2, 3, 4].map(i => <div key={i}
-                                                className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
-                </div>
-            ) : filteredTickets.length === 0 ? (
-                <div className="w-full flex flex-col items-center justify-center py-24 text-slate-400">
-                    <span className="material-symbols-outlined text-6xl mb-4">inbox</span>
-                    <p className="text-lg font-semibold">Brak zgłoszeń</p>
-                    <p className="text-sm mt-1">Nie masz jeszcze żadnych zgłoszeń w tej kategorii.</p>
-                </div>
-            ) : (
-                <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {filteredTickets.map(ticket => (
-                        <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
-                    ))}
-                </div>
-            )}
+
+            <div className="w-full flex flex-col">
+                {isLoading ? (
+                    <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 animate-pulse">
+                        {[1, 2, 3, 4].map(i => <div key={i} className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
+                    </div>
+                ) : filteredTickets.length === 0 ? (
+                    <div className="w-full flex-1 flex flex-col items-center justify-center py-24 text-slate-400">
+                        <span className="material-symbols-outlined text-6xl mb-4 text-slate-300">inbox</span>
+                        <p className="text-lg font-bold text-slate-500">Brak zgłoszeń</p>
+                        <p className="text-sm mt-1 text-slate-400">
+                            {isCoordinator ? "System nie posiada żadnych zgłoszeń w tej kategorii." : "Nie masz jeszcze żadnych zgłoszeń w tej kategorii."}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        {filteredTickets.map(ticket => (
+                            <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary"/>
                 <StatItem label="Oczekujące" value={stats.pending} color="text-error"/>
