@@ -103,7 +103,7 @@ const TicketCard = ({ticket, onClick}) => {
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                     <div className="flex items-center gap-2">
-                        <StatusBadge status={mapStatusToBadge(ticket.status)} />
+                        <StatusBadge status={mapStatusToBadge(ticket.status)}/>
                     </div>
                     <button
                         className="text-primary font-bold text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
@@ -140,7 +140,7 @@ const TicketModal = ({ticket, onClose}) => {
                         ✕
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
                     {/* Status and Priority */}
                     <div className="flex flex-wrap gap-3">
                         <StatusBadge status={mapStatusToBadge(ticket.status)}/>
@@ -271,12 +271,12 @@ export default function MyTickets() {
     const isCoordinator = user?.role?.toLowerCase() === "coordinator";
 
     useEffect(() => {
-        if (!user){
+        if (!user) {
             return;
         }
         const endpoint = isCoordinator ? 'tickets/' : 'tickets/my/';
         api.get(endpoint).then(res => {
-            setTickets(res.data.results ||[]);
+            setTickets(res.data.results || []);
             setIsLoading(false);
         }).catch(err => {
             console.error("Błąd pobierania zgłoszeń:", err);
@@ -302,15 +302,16 @@ export default function MyTickets() {
     }), [tickets]);
 
     return (
-        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto min-h-screen font-['Lexend']">
-            <div className="mb-8">
+        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend']">
+            <div className="mb-3 shrink-0">
                 <p className="text-primary text-xl font-bold text-slate-900 mb-2">
                     {isCoordinator ? "Panel Koordynatora" : "Podsumowanie konta"}
                 </p>
                 <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-6">
                     {isCoordinator ? "Wszystkie zgłoszenia w systemie" : "Moje zgłoszenia"}
                 </h2>
-                <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-1">
+                <div
+                    className="flex overflow-x-auto whitespace-nowrap gap-2 border-b border-slate-200 pb-1 no-scrollbar pb-2">
                     {['Wszystkie', 'Oczekujące', 'W trakcie', 'Rozwiązane'].map(tab => (
                         <button
                             key={tab}
@@ -324,34 +325,37 @@ export default function MyTickets() {
                     ))}
                 </div>
             </div>
+            <div className="flex-1 overflow-y-auto min-h-0 pr-2 pb-8 scrollbar-thin">
+                <div className="w-full flex flex-col">
+                    {isLoading ? (
+                        <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 animate-pulse">
+                            {[1, 2, 3, 4].map(i => <div key={i}
+                                                        className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
+                        </div>
+                    ) : filteredTickets.length === 0 ? (
+                        <div className="w-full flex-1 flex flex-col items-center justify-center py-24 text-slate-400">
+                            <span className="material-symbols-outlined text-6xl mb-4 text-slate-300">inbox</span>
+                            <p className="text-lg font-bold text-slate-500">Brak zgłoszeń</p>
+                            <p className="text-sm mt-1 text-slate-400">
+                                {isCoordinator ? "System nie posiada żadnych zgłoszeń w tej kategorii." : "Nie masz jeszcze żadnych zgłoszeń w tej kategorii."}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            {filteredTickets.map(ticket => (
+                                <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
-            <div className="w-full flex flex-col">
-                {isLoading ? (
-                    <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 animate-pulse">
-                        {[1, 2, 3, 4].map(i => <div key={i} className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
-                    </div>
-                ) : filteredTickets.length === 0 ? (
-                    <div className="w-full flex-1 flex flex-col items-center justify-center py-24 text-slate-400">
-                        <span className="material-symbols-outlined text-6xl mb-4 text-slate-300">inbox</span>
-                        <p className="text-lg font-bold text-slate-500">Brak zgłoszeń</p>
-                        <p className="text-sm mt-1 text-slate-400">
-                            {isCoordinator ? "System nie posiada żadnych zgłoszeń w tej kategorii." : "Nie masz jeszcze żadnych zgłoszeń w tej kategorii."}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        {filteredTickets.map(ticket => (
-                            <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
-                        ))}
-                    </div>
-                )}
-            </div>
+                <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary"/>
+                    <StatItem label="Oczekujące" value={stats.pending} color="text-error"/>
+                    <StatItem label="W trakcie" value={stats.progress} color="text-blue-600"/>
+                    <StatItem label="Rozwiązane" value={stats.resolved} color="text-secondary"/>
+                </div>
 
-            <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary"/>
-                <StatItem label="Oczekujące" value={stats.pending} color="text-error"/>
-                <StatItem label="W trakcie" value={stats.progress} color="text-blue-600"/>
-                <StatItem label="Rozwiązane" value={stats.resolved} color="text-secondary"/>
             </div>
             <TicketModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)}/>
         </div>
@@ -364,5 +368,6 @@ function StatItem({label, value, color}) {
             <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
             <p className={`text-3xl font-extrabold ${color}`}>{value}</p>
         </div>
-    );
+    )
+        ;
 }
