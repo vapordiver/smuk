@@ -13,7 +13,7 @@ def calculate_priority(ticket_id):
     
     seven_days_ago = ticket.created_at - timedelta(days=7)
     
-    similar_tickets_count = Ticket.object.filter(
+    similar_tickets_count = Ticket.objects.filter(
         category=ticket.category,
         created_at__gte=seven_days_ago,
         created_at__lte=ticket.created_at,
@@ -22,9 +22,9 @@ def calculate_priority(ticket_id):
 
     new_priority = ticket.priority
     if similar_tickets_count >= 5:
-        new_priority = Ticket.priority.HIGH
+        new_priority = Ticket.Priority.HIGH
     elif similar_tickets_count >= 3:
-        new_priority = Ticket.priority.MEDIUM
+        new_priority = Ticket.Priority.MEDIUM
     
     if new_priority != ticket.priority:
         old_priority = ticket.priority
