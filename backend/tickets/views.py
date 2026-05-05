@@ -97,6 +97,8 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         # only coordinators
         if self.action == 'list':
             return [IsAuthenticated(), IsInCoordinatorGroup()]
+        elif self.action in ['update', 'partial_update']:
+            return[IsAuthenticated(), IsInCoordinatorGroup()]
         # ticket detail -> object-level
         elif self.action == 'retrieve':
             return [IsAuthenticated(), IsCoordinatorOrOwner()]
