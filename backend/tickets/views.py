@@ -5,10 +5,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
-from .models import Building, FaultCategory, Ticket
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer
+from .models import Building, FaultCategory, Ticket, AuditLog
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, TicketUpdateSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
+from django.db import transaction
+from .tasks import calculate_priority
 
 
 class BuildingsListView(generics.ListAPIView):
@@ -37,13 +39,14 @@ class FaultCategoriesListView(generics.ListAPIView):
     pagination_class = None
 
 
-class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet, mixins.UpdateModelMixin):
     """
     `ticket` ViewSet for:
     `GET /api/tickets/`      (list)
     `GET /api/tickets/<id>/` (retrieve)
     `GET /api/tickets/my/`   (get_my_tickets)
     `POST /api/tickets/`     (create)
+    `PATCH /api/tickets/<id>/` (partial_update)
     """
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = TicketFilter
@@ -131,7 +134,9 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ticket = Ticket.objects.create(
+
+        with transaction.atomic():
+            ticket = Ticket.objects.create(
             title=serializer.validated_data["title"],
             description=serializer.validated_data["description"],
             category_id=serializer.validated_data["category_id"],
@@ -141,7 +146,34 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             location=serializer.validated_data["_point"],
             image=compressed_image,
             reporter=request.user,
-        )
+            )
 
+            transaction.on_commit(lambda: calculate_priority.delay(ticket.id))
+        
         output_serializer = TicketDetailSerializer(ticket)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+        def perform_update(self, serializer):
+            instance = self.get_object()
+            
+            changes = {}
+            for field, new_value in serializer.validated_data.items():
+                old_value = getattr(instance, field)
+                if old_value != new_value:
+                    changes[field] = (old_value, new_value)
+
+            updated_ticket = serializer.save()
+
+            logs_to_create = [
+                AuditLog(
+                    ticket=updated_ticket,
+                    user=self.request_user,
+                    field_changed=field,
+                    old_value=str(old_val),
+                    new_value=str(new_val)
+                )
+                for field, (old_val, new_val) in changes.items()
+            ]
+
+            if logs_to_create:
+                AuditLog.objects.bulk_create(logs_to_create)
