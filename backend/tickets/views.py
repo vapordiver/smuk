@@ -155,7 +155,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         output_serializer = TicketDetailSerializer(ticket)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
-        def perform_update(self, serializer):
+    def perform_update(self, serializer):
             instance = self.get_object()
             
             changes = {}
@@ -169,7 +169,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             logs_to_create = [
                 AuditLog(
                     ticket=updated_ticket,
-                    user=self.request_user,
+                    user=self.request.user,
                     field_changed=field,
                     old_value=str(old_val),
                     new_value=str(new_val)
