@@ -38,4 +38,3 @@ def calculate_priority(ticket_id):
             old_value=old_priority,
             new_value=new_priority,
         )
-
