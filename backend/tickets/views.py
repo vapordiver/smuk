@@ -82,6 +82,8 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             return TicketListSerializer
         if self.action == 'create':
             return TicketCreateSerializer
+        if self.action in ['update', 'partial_update']:
+            return TicketUpdateSerializer
 
         return TicketDetailSerializer
 
