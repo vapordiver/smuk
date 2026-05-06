@@ -141,15 +141,15 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
         with transaction.atomic():
             ticket = Ticket.objects.create(
-            title=serializer.validated_data["title"],
-            description=serializer.validated_data["description"],
-            category_id=serializer.validated_data["category_id"],
-            building_id=serializer.validated_data.get("building_id"),
-            # floor=serializer.validated_data.get("floor"),
-            # room=serializer.validated_data.get("room", ""),
-            location=serializer.validated_data["_point"],
-            image=compressed_image,
-            reporter=request.user,
+                title=serializer.validated_data["title"],
+                description=serializer.validated_data["description"],
+                category_id=serializer.validated_data["category_id"],
+                building_id=serializer.validated_data.get("building_id"),
+                # floor=serializer.validated_data.get("floor"),
+                # room=serializer.validated_data.get("room", ""),
+                location=serializer.validated_data["_point"],
+                image=compressed_image,
+                reporter=request.user,
             )
 
             transaction.on_commit(lambda: calculate_priority.delay(ticket.id))
