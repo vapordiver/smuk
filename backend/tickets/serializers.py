@@ -56,8 +56,8 @@ class TicketListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ticket
         fields = [
-            "id", "title", "status", "priority", "category",
-            "building", "reporter", "image", "created_at"
+            "id", "title", "description", "status", "priority", "category",
+            "building", "floor", "room", "reporter", "location", "image", "created_at"
         ]
 
 
