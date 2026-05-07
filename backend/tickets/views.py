@@ -166,18 +166,19 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 if old_value != new_value:
                     changes[field] = (old_value, new_value)
 
-            updated_ticket = serializer.save()
+            with transaction.atomic():
+                updated_ticket = serializer.save()
 
-            logs_to_create = [
-                AuditLog(
-                    ticket=updated_ticket,
-                    user=self.request.user,
-                    field_changed=field,
-                    old_value=str(old_val),
-                    new_value=str(new_val)
-                )
-                for field, (old_val, new_val) in changes.items()
-            ]
+                logs_to_create = [
+                    AuditLog(
+                        ticket=updated_ticket,
+                        user=self.request.user,
+                        field_changed=field,
+                        old_value=str(old_val),
+                        new_value=str(new_val)
+                    )
+                    for field, (old_val, new_val) in changes.items()
+                ]
 
-            if logs_to_create:
-                AuditLog.objects.bulk_create(logs_to_create)
+                if logs_to_create:
+                    AuditLog.objects.bulk_create(logs_to_create)
