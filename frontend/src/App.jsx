@@ -11,6 +11,7 @@ import Register from './pages/Register';
 import CampusMap from './pages/CampusMap';
 import AdminPanel from './pages/AdminPanel';
 import ProfilePage from './pages/ProfilePage';
+import CoordinatorPanel from './pages/CoordinatorPanel';
 import ProtectedRoute from "./components/common/ProtectedRoute";
 
 /**
@@ -55,7 +56,7 @@ export default function App() {
                         <Route element={<ProtectedRoute/>}>
                             <Route path="/report" element={<ReportForm/>}/>
                             <Route path="/my-tickets" element={<MyTickets/>}/>
-                            <Route path="/admin" element={<AdminPanel/>}/>
+                            <Route path="/admin" element={<CoordinatorPanel/>}/>
                             <Route path="/profile" element={<ProfilePage/>}/>
                         </Route>
                     </Route>

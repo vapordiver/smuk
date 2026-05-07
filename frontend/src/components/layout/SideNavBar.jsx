@@ -11,7 +11,7 @@ import ImpactButton from '../common/ImpactButton';
  */
 
 // MOCK — zmień na AuthContext w SMUK-7
-const userRole = 'REPORTER'; // 'COORDINATOR' | 'REPORTER'
+const userRole = 'COORDINATOR'; // 'COORDINATOR' | 'REPORTER'
 
 const NAV_ITEMS = [
   { to: '/', icon: 'dashboard', label: 'Dashboard' },
@@ -48,7 +48,7 @@ export default function SideNavBar({ isOpen, onClose }) {
   const location = useLocation();
 
   const roleLink = userRole === 'COORDINATOR'
-    ? { to: '/admin', icon: 'admin_panel_settings', label: 'Panel Koordynatora' }
+    ? { to: '/admin', icon: 'admin_panel_settings', label: 'Analiza zgłoszeń' }
     : null;
 
   return (
