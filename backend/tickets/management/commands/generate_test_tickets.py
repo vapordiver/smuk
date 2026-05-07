@@ -74,8 +74,8 @@ class Command(BaseCommand):
         # 3. Fetch dependencies (Building, Category)
         building_a10 = Building.objects.filter(name__icontains='A10').first()
         building_c3 = Building.objects.filter(name__icontains='C3').first()
-        # K22 doesn't exist in current fixtures, fallback to A1 (or any available)
-        building_k22 = Building.objects.filter(name__icontains='K22').first() or Building.objects.filter(name__icontains='A1').first()
+        # B18 building fallback to A1 if missing
+        building_b18 = Building.objects.filter(name__icontains='B18').first() or Building.objects.filter(name__icontains='A1').first()
 
         category_water = FaultCategory.objects.filter(name='Instalacja wodna').first()
         category_elec = FaultCategory.objects.filter(name='Elektryka').first()
@@ -114,12 +114,12 @@ class Command(BaseCommand):
             status=Ticket.Status.IN_PROGRESS
         )
 
-        # Ticket 3 (Reporter 2) - K22 (or fallback) Ogrzewanie
+        # Ticket 3 (Reporter 2) - B18 Ogrzewanie
         t3 = Ticket.objects.create(
             title="Niedziałający kaloryfer na auli",
             description="Kaloryfer w głównej auli na końcu sali jest całkowicie zimny, mimo że zawór jest odkręcony na maksimum. W sali jest bardzo zimno.",
-            location=building_k22.centroid,
-            building=building_k22,
+            location=building_b18.centroid,
+            building=building_b18,
             category=category_heat,
             reporter=reporter2,
             priority=Ticket.Priority.CRITICAL,
