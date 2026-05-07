@@ -11,6 +11,9 @@ def calculate_priority(ticket_id):
     except Ticket.DoesNotExist:
         return
     
+    if ticket.priority != Ticket.Priority.LOW:
+        return
+
     seven_days_ago = ticket.created_at - timedelta(days=7)
     
     similar_tickets_count = Ticket.objects.filter(
