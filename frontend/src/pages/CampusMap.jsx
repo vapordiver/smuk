@@ -1,11 +1,10 @@
-import {useState, useEffect, useCallback} from 'react';
-import {MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents} from 'react-leaflet';
+import {useState, useEffect} from 'react';
+import {MapContainer, TileLayer, Marker, Popup} from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from '../services/api';
 
-// leaflet icon fix (same as MyTickets.jsx)
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -40,15 +39,15 @@ const createPriorityIcon = (priority) => {
     return L.divIcon({
         className: '',
         html: `<div style="
-            width: 24px;
-            height: 24px;
+            width: 30px;
+            height: 30px;
             background-color: ${color};
             border: 3px solid white;
             border-radius: 50%;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         "></div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
     });
 };
 
@@ -91,46 +90,78 @@ const formatDate = (isoString) => {
     });
 };
 
+// /**
+//  * Inner component that listens to map move events 
+//  * and fetches GeoJSON data with bbox filtering
+//  */
+// function MapEvents({onFeaturesLoaded}) {
+//     const map = useMap();
+//     const timeoutRef = useRef(null);
+
+//     const fetchGeoJSON = useCallback(() => {
+//         const bounds = map.getBounds();
+//         const bbox = [
+//             bounds.getSouthWest().lng,
+//             bounds.getSouthWest().lat,
+//             bounds.getNorthEast().lng,
+//             bounds.getNorthEast().lat,
+//         ].join(',');
+
+//         api.get('tickets/geojson/', {params: {bbox}})
+//             .then(res => {
+//                 onFeaturesLoaded(res.data.features || []);
+//             })
+//             .catch(err => {
+//                 console.error('[CampusMap] GET /api/tickets/geojson/ failed:', err.message);
+//             });
+//     }, [map, onFeaturesLoaded]);
+
+//     // fetch on initial render
+//     useEffect(() => {
+//         fetchGeoJSON();
+//     }, [fetchGeoJSON]);
+
+//     // debounced fetch on map move/zoom (prevents popup flickering)
+//     useMapEvents({
+//         moveend: () => {
+//             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+//             timeoutRef.current = setTimeout(fetchGeoJSON, 300);
+//         },
+//     });
+
+//     return null;
+// }
+
 /**
- * Inner component that listens to map move events 
- * and fetches GeoJSON data with bbox filtering
+ * Fetches GeoJSON data once on mount
  */
-function MapEvents({onFeaturesLoaded}) {
-    const map = useMap();
-
-    const fetchGeoJSON = useCallback(() => {
-        const bounds = map.getBounds();
-        const bbox = [
-            bounds.getSouthWest().lng,
-            bounds.getSouthWest().lat,
-            bounds.getNorthEast().lng,
-            bounds.getNorthEast().lat,
-        ].join(',');
-
-        api.get('tickets/geojson/', {params: {bbox}})
+function MapDataLoader({onFeaturesLoaded}) {
+    useEffect(() => {
+        api.get('tickets/geojson/')
             .then(res => {
                 onFeaturesLoaded(res.data.features || []);
             })
             .catch(err => {
                 console.error('[CampusMap] GET /api/tickets/geojson/ failed:', err.message);
             });
-    }, [map, onFeaturesLoaded]);
-
-    // fetch on initial render
-    useEffect(() => {
-        fetchGeoJSON();
-    }, [fetchGeoJSON]);
-
-    // fetch on every map move/zoom
-    useMapEvents({
-        moveend: fetchGeoJSON,
-    });
+    }, [onFeaturesLoaded]);
 
     return null;
 }
 
+
 export default function CampusMap() {
     const [features, setFeatures] = useState([]);
+
+    // // only update state if the visible tickets actually changed
+    // const handleFeaturesLoaded = useCallback((newFeatures) => {
+    //     setFeatures(prev => {
+    //         const prevIds = prev.map(f => f.properties.id).sort().join(',');
+    //         const newIds = newFeatures.map(f => f.properties.id).sort().join(',');
+    //         if (prevIds === newIds) return prev;
+    //         return newFeatures;
+    //     });
+    // }, []);
 
     return (
         <div className="flex flex-col h-full">
@@ -139,10 +170,19 @@ export default function CampusMap() {
                 zoom={DEFAULT_ZOOM}
                 className="flex-1 w-full z-0"
                 scrollWheelZoom={true}
+                tap={false}
             >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
-                <MapEvents onFeaturesLoaded={setFeatures}/>
-                <MarkerClusterGroup chunkedLoading iconCreateFunction={createClusterIcon}>
+                <MapDataLoader onFeaturesLoaded={setFeatures}/>
+                <MarkerClusterGroup
+                iconCreateFunction={createClusterIcon}
+                zoomToBoundsOnClick={true}
+                spiderfyOnMaxZoom={true}
+                disableClusteringAtZoom={18}
+                spiderfyDistanceMultiplier={1.5}
+                maxClusterRadius={60}
+                removeOutsideVisibleBounds={false}
+            > 
                     {features.map(feature => {
                         const {coordinates} = feature.geometry;
                         const props = feature.properties;
