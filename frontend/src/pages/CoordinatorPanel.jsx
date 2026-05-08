@@ -129,20 +129,20 @@ function BarChart({ data }) {
       </div>
 
       {data.map((bar) => (
-        <div key={bar.label} className="flex flex-col items-center w-full z-10 group cursor-pointer">
+        <div key={bar.label} className="flex flex-col items-center justify-end w-full h-full z-10">
           <div
-            className={`w-full rounded-t-md relative transition-colors ${
-              bar.active ? 'bg-primary' : 'bg-primary/20 group-hover:bg-primary'
+            className={`w-full rounded-t-md relative ${
+              bar.active ? 'bg-primary' : 'bg-primary/30'
             }`}
             style={{ height: `${bar.heightPct}%` }}
           >
-            <div
-              className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-xs py-1 px-2 rounded font-medium transition-opacity shadow-sm ${
-                bar.active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-              }`}
-            >
-              {bar.value}
-            </div>
+            {bar.active && (
+              <div
+                className="absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-xs py-1 px-2 rounded font-medium shadow-sm"
+              >
+                {bar.value}
+              </div>
+            )}
           </div>
           <span
             className={`text-xs font-medium mt-3 ${
@@ -213,13 +213,6 @@ function ReportRow({ report, dateFrom, dateTo }) {
           <span className="material-symbols-outlined text-[18px]">csv</span>
           CSV
         </button>
-        <button
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary font-semibold text-sm hover:scale-[0.97] active:scale-[0.95] transition-all shadow-sm"
-          title="Generuj raport"
-        >
-          <span className="material-symbols-outlined text-[18px]">bolt</span>
-          Generuj
-        </button>
       </div>
     </div>
   );
@@ -244,36 +237,45 @@ function TicketRow({ ticket }) {
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto" onClick={(e) => e.stopPropagation()}>
-           <select 
-              value={status} 
-              onChange={(e) => setStatus(e.target.value)}
-              className={`text-xs font-bold uppercase rounded-lg px-2 py-1 outline-none border border-outline-variant appearance-none cursor-pointer ${STATUS_MAP[status]?.color}`}
-           >
-             {Object.entries(STATUS_MAP).map(([k, v]) => (
-               <option key={k} value={k} className="bg-surface text-on-surface uppercase">{v.label}</option>
-             ))}
-           </select>
+           <div className="relative group cursor-pointer" title="Zmień status">
+             <select 
+                value={status} 
+                onChange={(e) => setStatus(e.target.value)}
+                className={`text-xs font-bold uppercase rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none cursor-pointer hover:shadow-sm transition-shadow ${STATUS_MAP[status]?.color}`}
+             >
+               {Object.entries(STATUS_MAP).map(([k, v]) => (
+                 <option key={k} value={k} className="bg-surface text-on-surface uppercase">{v.label}</option>
+               ))}
+             </select>
+             <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>
+           </div>
 
-           <select 
-              value={priority} 
-              onChange={(e) => setPriority(e.target.value)}
-              className={`text-xs font-bold rounded-lg px-2 py-1 outline-none border border-outline-variant appearance-none cursor-pointer ${PRIORITY_MAP[priority]?.color}`}
-           >
-             {Object.entries(PRIORITY_MAP).map(([k, v]) => (
-               <option key={k} value={k} className="bg-surface text-on-surface">{v.label}</option>
-             ))}
-           </select>
+           <div className="relative group cursor-pointer" title="Zmień priorytet">
+             <select 
+                value={priority} 
+                onChange={(e) => setPriority(e.target.value)}
+                className={`text-xs font-bold rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none cursor-pointer hover:shadow-sm transition-shadow ${PRIORITY_MAP[priority]?.color}`}
+             >
+               {Object.entries(PRIORITY_MAP).map(([k, v]) => (
+                 <option key={k} value={k} className="bg-surface text-on-surface">{v.label}</option>
+               ))}
+             </select>
+             <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>
+           </div>
 
-           <select
-             value={assignee}
-             onChange={(e) => setAssignee(e.target.value)}
-             className="text-xs font-medium rounded-lg px-2 py-1 outline-none border border-outline-variant appearance-none cursor-pointer bg-surface-container-low text-on-surface"
-           >
-             <option value="">Nieprzypisane</option>
-             <option value="Jan Kowalski">Jan Kowalski</option>
-             <option value="Anna Nowak">Anna Nowak</option>
-             <option value="Piotr Wiśniewski">Piotr Wiśniewski</option>
-           </select>
+           <div className="relative group cursor-pointer" title="Zmień przypisanie">
+             <select
+               value={assignee}
+               onChange={(e) => setAssignee(e.target.value)}
+               className="text-xs font-medium rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none cursor-pointer bg-surface-container-low text-on-surface hover:shadow-sm transition-shadow"
+             >
+               <option value="">Nieprzypisane</option>
+               <option value="Jan Kowalski">Jan Kowalski</option>
+               <option value="Anna Nowak">Anna Nowak</option>
+               <option value="Piotr Wiśniewski">Piotr Wiśniewski</option>
+             </select>
+             <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>
+           </div>
 
            <button className="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" onClick={() => setExpanded(!expanded)}>
              <span className="material-symbols-outlined text-[20px]">

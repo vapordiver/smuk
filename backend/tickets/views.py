@@ -37,7 +37,7 @@ class FaultCategoriesListView(generics.ListAPIView):
     pagination_class = None
 
 
-class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
     `ticket` ViewSet for:
     `GET /api/tickets/`      (list)
@@ -79,6 +79,9 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             return TicketListSerializer
         if self.action == 'create':
             return TicketCreateSerializer
+        if self.action in ['update', 'partial_update']:
+            from .serializers import TicketUpdateSerializer
+            return TicketUpdateSerializer
 
         return TicketDetailSerializer
 
@@ -92,7 +95,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
     def get_permissions(self):
         # only coordinators
-        if self.action == 'list':
+        if self.action in ['list', 'update', 'partial_update']:
             return [IsAuthenticated(), IsInCoordinatorGroup()]
         # ticket detail -> object-level
         elif self.action == 'retrieve':
@@ -144,4 +147,50 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         )
 
         output_serializer = TicketDetailSerializer(ticket)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        ticket = self.get_object()
+        serializer = self.get_serializer(ticket, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        old_status = ticket.status
+        old_priority = ticket.priority
+        old_assigned = ticket.assigned_to_id
+
+        self.perform_update(serializer)
+
+        from .models import AuditLog
+
+        if 'status' in serializer.validated_data and serializer.validated_data['status'] != old_status:
+            AuditLog.objects.create(
+                ticket=ticket,
+                user=request.user,
+                field_changed='status',
+                old_value=old_status,
+                new_value=serializer.validated_data['status']
+            )
+
+        if 'priority' in serializer.validated_data and serializer.validated_data['priority'] != old_priority:
+            AuditLog.objects.create(
+                ticket=ticket,
+                user=request.user,
+                field_changed='priority',
+                old_value=old_priority,
+                new_value=serializer.validated_data['priority']
+            )
+
+        if 'assigned_to_id' in serializer.validated_data:
+            new_assigned = serializer.validated_data['assigned_to_id']
+            if new_assigned != old_assigned:
+                AuditLog.objects.create(
+                    ticket=ticket,
+                    user=request.user,
+                    field_changed='assigned_to',
+                    old_value=str(old_assigned) if old_assigned else None,
+                    new_value=str(new_assigned) if new_assigned else None
+                )
+
+        output_serializer = TicketDetailSerializer(ticket)
+        return Response(output_serializer.data)

@@ -189,3 +189,21 @@ class TicketCreateSerializer(serializers.Serializer):
         attrs["_point"] = point
 
         return attrs
+
+class TicketUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer used for updating ticket status, priority, and assigned_to (PATCH /api/tickets/<id>/).
+    """
+    assigned_to_id = serializers.UUIDField(required=False, allow_null=True)
+
+    class Meta:
+        model = Ticket
+        fields = ["status", "priority", "assigned_to_id"]
+
+    def validate_assigned_to_id(self, value):
+        from django.contrib.auth import get_user_model
+        if value is not None:
+            User = get_user_model()
+            if not User.objects.filter(pk=value).exists():
+                raise serializers.ValidationError("User with this ID does not exist.")
+        return value
