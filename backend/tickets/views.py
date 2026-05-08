@@ -5,8 +5,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
-from .models import Building, FaultCategory, Ticket
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer
+from .models import Building, FaultCategory, Ticket, Campus
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
 from django.contrib.gis.geos import Polygon
@@ -20,6 +20,17 @@ class BuildingsListView(generics.ListAPIView):
 
     queryset = Building.objects.all()
     serializer_class = BuildingSerializer
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    pagination_class = None
+
+class CampusListView(generics.ListAPIView):
+    """
+    GET /api/campuses/
+    Public endpoint that returns campus polygons for map overlay.
+    """
+    queryset = Campus.objects.all()
+    serializer_class = CampusSerializer
     authentication_classes = []
     permission_classes = [AllowAny]
     pagination_class = None

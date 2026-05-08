@@ -1,5 +1,5 @@
 import {useState, useEffect} from 'react';
-import {MapContainer, TileLayer, Marker, Popup} from 'react-leaflet';
+import {MapContainer, TileLayer, Marker, Popup, Polygon} from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -73,6 +73,11 @@ function MapDataLoader({onFeaturesLoaded}) {
 
 export default function CampusMap() {
     const [features, setFeatures] = useState([]);
+    const [campuses, setCampuses] = useState([]);
+
+    useEffect(() => {
+        api.get('campuses/').then(res => setCampuses(res.data || [])).catch(() => {});
+    }, []);
 
     return (
         <div className="flex flex-col h-full">
@@ -85,6 +90,19 @@ export default function CampusMap() {
             >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
                 <MapDataLoader onFeaturesLoaded={setFeatures}/>
+                {campuses.map(campus => campus.polygon && (
+                    <Polygon
+                        key={`campus-${campus.id}`}
+                        positions={campus.polygon.coordinates[0].map(c => [c[1], c[0]])}
+                        pathOptions={{
+                            color: '#4f46e5',
+                            weight: 2,
+                            fillColor: '#4f46e5',
+                            fillOpacity: 0.08,
+                            dashArray: '6 4',
+                        }}
+                    />
+                ))}
                 <MarkerClusterGroup
                 iconCreateFunction={createClusterIcon}
                 zoomToBoundsOnClick={true}
