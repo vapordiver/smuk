@@ -189,3 +189,12 @@ class TicketCreateSerializer(serializers.Serializer):
         attrs["_point"] = point
 
         return attrs
+
+class TicketUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer used for PATCH /api/tickets/<id>/
+    Allows coordinators to manually override specific fields like priority or status.
+    """
+    class Meta:
+        model = Ticket
+        fields = ["priority", "status", "assigned_to"]
