@@ -224,6 +224,15 @@ function TicketRow({ ticket }) {
   const [priority, setPriority] = useState(ticket.priority);
   const [assignee, setAssignee] = useState(ticket.assignee);
 
+  const hasChanges = status !== ticket.status || priority !== ticket.priority || assignee !== ticket.assignee;
+
+  const handleSave = (e) => {
+    e.stopPropagation();
+    // Tutaj w przyszłości pójdzie PATCH
+    console.log('PATCH z danymi:', { id: ticket.id, status, priority, assignee });
+    alert('Zmiany zapisane (MOCK)');
+  };
+
   return (
     <div className="bg-surface rounded-xl flex flex-col outline outline-1 outline-outline hover:shadow-sm transition-shadow">
       <div className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer" onClick={() => setExpanded(!expanded)}>
@@ -277,7 +286,18 @@ function TicketRow({ ticket }) {
              <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>
            </div>
 
-           <button className="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" onClick={() => setExpanded(!expanded)}>
+           {hasChanges && (
+             <button 
+               className="px-3 py-1 bg-primary text-on-primary text-xs font-bold rounded-lg hover:scale-[0.98] transition-transform shadow-sm flex items-center gap-1"
+               onClick={handleSave}
+               title="Zapisz zmiany"
+             >
+               <span className="material-symbols-outlined text-[14px]">save</span>
+               Zapisz
+             </button>
+           )}
+
+           <button className="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors ml-auto md:ml-0" onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}>
              <span className="material-symbols-outlined text-[20px]">
                {expanded ? 'expand_less' : 'expand_more'}
              </span>

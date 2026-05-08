@@ -93,19 +93,19 @@ export default function SideNavBar({ isOpen, onClose }) {
           />
         ))}
 
+        {/* Role-based link */}
+        {roleLink && (
+          <NavLink
+            to={roleLink.to}
+            icon={roleLink.icon}
+            label={roleLink.label}
+            isActive={location.pathname === roleLink.to}
+            onClick={onClose}
+          />
+        )}
+
         {/* Bottom section */}
         <div className="mt-auto flex flex-col gap-2 pb-8 sm:pb-4">
-          {/* Role-based link */}
-          {roleLink && (
-            <NavLink
-              to={roleLink.to}
-              icon={roleLink.icon}
-              label={roleLink.label}
-              isActive={location.pathname === roleLink.to}
-              onClick={onClose}
-            />
-          )}
-
           {/* New report CTA */}
           <Link to="/report" onClick={onClose} title="Nowe zgłoszenie">
             <div className="sidebar-cta-full">
