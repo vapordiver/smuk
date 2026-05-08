@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
+import '@fontsource-variable/lexend';
 import App from './App.jsx'
 
 registerSW({ immediate: true })

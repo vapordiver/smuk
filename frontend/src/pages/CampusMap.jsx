@@ -48,7 +48,7 @@ const createClusterIcon = (cluster) => {
             color: white;
             font-weight: 700;
             font-size: ${count >= 100 ? '13' : '15'}px;
-            font-family: 'Lexend', sans-serif;
+            font-family: 'Lexend Variable', sans-serif;
             box-shadow: 0 3px 10px rgba(17, 50, 212, 0.4);
         ">${count}</div>`,
         className: '',
@@ -125,7 +125,7 @@ export default function CampusMap() {
                                 icon={createPriorityIcon(props.priority)}
                             >
                                 <Popup>
-                                    <div className="font-['Lexend'] min-w-[200px]">
+                                    <div className="font-['Lexend_Variable'] min-w-[200px]">
                                         <h3 className="font-bold text-slate-900 text-sm mb-2">{props.title}</h3>
                                         <div className="space-y-1 text-xs text-slate-600">
                                             <p>

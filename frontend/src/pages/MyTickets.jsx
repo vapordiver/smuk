@@ -272,7 +272,7 @@ export default function MyTickets() {
     }), [tickets]);
 
     return (
-        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend']">
+        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend_Variable']">
             <div className="mb-3 shrink-0">
                 <p className="text-primary text-xl font-bold text-slate-900 mb-2">
                     {isCoordinator ? "Panel Koordynatora" : "Podsumowanie konta"}
