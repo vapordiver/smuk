@@ -4,35 +4,13 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from '../services/api';
+import '../utils/leafletSetup';
+import {formatDate, PRIORITY_LABELS, PRIORITY_COLORS} from '../utils/formatters';
 
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconUrl: markerIcon,
-    iconRetinaUrl: markerIcon2x,
-    shadowUrl: markerShadow,
-});
 
 // campus center (calculated from campuses A, B, C polygons)
 const CAMPUS_CENTER = [51.7500, 19.4520];
 const DEFAULT_ZOOM = 15;
-
-const PRIORITY_COLORS = {
-    LOW: '#22c55e',
-    MEDIUM: '#eab308',
-    HIGH: '#ef4444',
-    CRITICAL: '#171717',
-};
-
-const PRIORITY_LABELS = {
-    LOW: 'Niski',
-    MEDIUM: 'Średni',
-    HIGH: 'Wysoki',
-    CRITICAL: 'Krytyczny',
-};
 
 const createPriorityIcon = (priority) => {
     const color = PRIORITY_COLORS[priority] || PRIORITY_COLORS.LOW;
@@ -78,63 +56,6 @@ const createClusterIcon = (cluster) => {
     });
 };
 
-
-const formatDate = (isoString) => {
-    if (!isoString) return '—';
-    return new Date(isoString).toLocaleDateString('pl-PL', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-};
-
-// /**
-//  * Inner component that listens to map move events 
-//  * and fetches GeoJSON data with bbox filtering
-//  */
-// function MapEvents({onFeaturesLoaded}) {
-//     const map = useMap();
-//     const timeoutRef = useRef(null);
-
-//     const fetchGeoJSON = useCallback(() => {
-//         const bounds = map.getBounds();
-//         const bbox = [
-//             bounds.getSouthWest().lng,
-//             bounds.getSouthWest().lat,
-//             bounds.getNorthEast().lng,
-//             bounds.getNorthEast().lat,
-//         ].join(',');
-
-//         api.get('tickets/geojson/', {params: {bbox}})
-//             .then(res => {
-//                 onFeaturesLoaded(res.data.features || []);
-//             })
-//             .catch(err => {
-//                 console.error('[CampusMap] GET /api/tickets/geojson/ failed:', err.message);
-//             });
-//     }, [map, onFeaturesLoaded]);
-
-//     // fetch on initial render
-//     useEffect(() => {
-//         fetchGeoJSON();
-//     }, [fetchGeoJSON]);
-
-//     // debounced fetch on map move/zoom (prevents popup flickering)
-//     useMapEvents({
-//         moveend: () => {
-//             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-//             timeoutRef.current = setTimeout(fetchGeoJSON, 300);
-//         },
-//     });
-
-//     return null;
-// }
-
-/**
- * Fetches GeoJSON data once on mount
- */
 function MapDataLoader({onFeaturesLoaded}) {
     useEffect(() => {
         api.get('tickets/geojson/')
@@ -152,16 +73,6 @@ function MapDataLoader({onFeaturesLoaded}) {
 
 export default function CampusMap() {
     const [features, setFeatures] = useState([]);
-
-    // // only update state if the visible tickets actually changed
-    // const handleFeaturesLoaded = useCallback((newFeatures) => {
-    //     setFeatures(prev => {
-    //         const prevIds = prev.map(f => f.properties.id).sort().join(',');
-    //         const newIds = newFeatures.map(f => f.properties.id).sort().join(',');
-    //         if (prevIds === newIds) return prev;
-    //         return newFeatures;
-    //     });
-    // }, []);
 
     return (
         <div className="flex flex-col h-full">
