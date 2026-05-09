@@ -227,7 +227,41 @@ const TicketModal = ({ticket, onClose}) => {
                                 Historia zmian
                             </h4>
                             <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
-                                {ticket.audit_log.map((entry, idx) => (
+                                {ticket.audit_log.map((entry, idx) => {
+                                    let actionText = `zmienił(a) "${entry.field_changed}"`;
+                                    let detailsNode = (
+                                        <div className="text-slate-500 mt-0.5">
+                                            z <span className="line-through">{entry.old_value}</span> na{' '}
+                                            <span className="font-medium text-emerald-600">{entry.new_value}</span>
+                                        </div>
+                                    );
+                                    
+                                    if (entry.field_changed === 'note') {
+                                        actionText = 'dodał(a) notatkę zamykającą';
+                                        detailsNode = (
+                                            <div className="text-slate-500 mt-0.5 italic">
+                                                "{entry.new_value}"
+                                            </div>
+                                        );
+                                    } else if (entry.field_changed === 'assigned_to') {
+                                        if (!entry.old_value || entry.old_value === 'None' || entry.old_value === 'null') {
+                                            actionText = 'przypisał(a) zgłoszenie';
+                                            detailsNode = (
+                                                <div className="text-slate-500 mt-0.5">
+                                                    do <span className="font-medium text-emerald-600">koordynatora</span>
+                                                </div>
+                                            );
+                                        } else {
+                                            actionText = 'zmienił(a) przypisanie';
+                                            detailsNode = (
+                                                <div className="text-slate-500 mt-0.5">
+                                                    na <span className="font-medium text-emerald-600">innego koordynatora</span>
+                                                </div>
+                                            );
+                                        }
+                                    }
+                                    
+                                    return (
                                     <div key={entry.id || idx}
                                          className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
                                         <div className="text-slate-400 whitespace-nowrap">
@@ -237,15 +271,11 @@ const TicketModal = ({ticket, onClose}) => {
                                             <span className="font-medium text-slate-700">
                                                 {entry.user?.first_name} {entry.user?.last_name}
                                             </span>
-                                            <span className="text-slate-500"> zmienił(a) </span>
-                                            <span className="font-medium">"{entry.field_changed}"</span>
-                                            <div className="text-slate-500 mt-0.5">
-                                                z <span className="line-through">{entry.old_value}</span> na{' '}
-                                                <span className="font-medium text-emerald-600">{entry.new_value}</span>
-                                            </div>
+                                            <span className="text-slate-500"> {actionText}</span>
+                                            {detailsNode}
                                         </div>
                                     </div>
-                                ))}
+                                )})}
                             </div>
                         </div>
                     )}
@@ -265,24 +295,54 @@ export default function MyTickets() {
     const {user} = useAuth();
     const [tickets, setTickets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const pageSize = 10;
+
     const [activeTab, setActiveTab] = useState('Wszystkie');
     const [selectedTicket, setSelectedTicket] = useState(null);
 
     const isCoordinator = user?.role?.toLowerCase() === "coordinator";
 
-    useEffect(() => {
-        if (!user) {
-            return;
-        }
-        const endpoint = isCoordinator ? 'tickets/' : 'tickets/my/';
-        api.get(endpoint).then(res => {
+    const fetchTickets = async () => {
+        if (!user) return;
+        setIsLoading(true);
+        
+        try {
+            const offset = (currentPage - 1) * pageSize;
+            const params = new URLSearchParams({
+                limit: pageSize,
+                offset: offset,
+            });
+
+            // Map tabs to backend statuses
+            if (activeTab === 'Oczekujące') params.append('status', 'NEW');
+            if (activeTab === 'W trakcie') params.append('status', 'IN_PROGRESS'); // Simplified for now
+            if (activeTab === 'Rozwiązane') params.append('status', 'RESOLVED');
+
+            const endpoint = isCoordinator ? 'tickets/' : 'tickets/my/';
+            const res = await api.get(`${endpoint}?${params.toString()}`);
             setTickets(res.data.results || []);
-            setIsLoading(false);
-        }).catch(err => {
+            setTotalCount(res.data.count || 0);
+        } catch (err) {
             console.error("Błąd pobierania zgłoszeń:", err);
+        } finally {
             setIsLoading(false);
-        });
-    }, [user, isCoordinator]);
+        }
+    };
+
+    useEffect(() => {
+        if (user) {
+            fetchTickets();
+        }
+    }, [user, isCoordinator, currentPage, activeTab]);
+
+    // Reset page when tab changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab]);
+
+    const totalPages = Math.ceil(totalCount / pageSize);
 
     // Filter logic
     const filteredTickets = useMemo(() => {
@@ -293,13 +353,13 @@ export default function MyTickets() {
         return tickets;
     }, [tickets, activeTab]);
 
-    // Stats
+    // Stats (these still fetch all or are simplified)
     const stats = useMemo(() => ({
-        total: tickets.length,
-        pending: tickets.filter(t => t.status === 'NEW').length,
-        progress: tickets.filter(t => ['IN_PROGRESS', 'NEEDS_REVIEW'].includes(t.status)).length,
-        resolved: tickets.filter(t => ['RESOLVED', 'CLOSED'].includes(t.status)).length,
-    }), [tickets]);
+        total: totalCount,
+        pending: '...', // Simplified as we'd need more API calls or a separate stats endpoint
+        progress: '...',
+        resolved: '...',
+    }), [totalCount]);
 
     return (
         <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend']">
@@ -341,10 +401,61 @@ export default function MyTickets() {
                             </p>
                         </div>
                     ) : (
-                        <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
-                            {filteredTickets.map(ticket => (
-                                <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
-                            ))}
+                        <div className="w-full flex flex-col items-center">
+                            <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                {tickets.map(ticket => (
+                                    <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
+                                ))}
+                            </div>
+                            
+                            {/* ── Pagination Footer ── */}
+                            {totalCount > 0 && (
+                                <div className="mt-12 flex flex-col items-center gap-4 w-full">
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1 || isLoading}
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-30 shadow-sm"
+                                        >
+                                            <span className="material-symbols-outlined">chevron_left</span>
+                                        </button>
+                                        
+                                        <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
+                                            {[...Array(totalPages)].map((_, i) => {
+                                                const pageNum = i + 1;
+                                                if (totalPages > 7 && (pageNum > 2 && pageNum < totalPages - 1 && Math.abs(pageNum - currentPage) > 1)) {
+                                                    if (pageNum === 3 || pageNum === totalPages - 2) return <span key={pageNum} className="px-2 text-slate-400">...</span>;
+                                                    return null;
+                                                }
+                                                return (
+                                                    <button
+                                                        key={pageNum}
+                                                        onClick={() => setCurrentPage(pageNum)}
+                                                        className={`w-9 h-9 flex items-center justify-center rounded-xl font-bold text-sm transition-all ${
+                                                            currentPage === pageNum 
+                                                            ? 'bg-primary text-white shadow-md shadow-primary/20' 
+                                                            : 'text-slate-600 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        {pageNum}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        
+                                        <button 
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages || totalPages === 0 || isLoading}
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-30 shadow-sm"
+                                        >
+                                            <span className="material-symbols-outlined">chevron_right</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+                                        Strona {currentPage} z {totalPages} • Łącznie {totalCount} zgłoszeń
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

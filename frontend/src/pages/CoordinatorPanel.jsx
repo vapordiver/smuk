@@ -1,14 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import api from '../services/api';
 
 /**
  * CoordinatorPanel – Analiza Zgłoszeń view for coordinator role.
  * Based on code.html mockup and the Indigo Scholar Design System (DESIGN.md).
- *
- * Replaces the "Kreator Raportu" section with a list of available reports
- * that can be triggered individually, with an optional date-range filter.
  */
 
-/* ── Mock data ── */
+/* ── Mock data (retained only for charts and reports) ── */
 const TREND_DATA = [
   { label: 'Wrz', value: 42, heightPct: 40 },
   { label: 'Paź', value: 68, heightPct: 65 },
@@ -42,64 +40,6 @@ const REPORTS_LIST = [
     description: 'Infrastruktura IT, Tylko zakończone',
     generatedAt: 'Wczoraj, 14:20',
   },
-  {
-    id: 3,
-    icon: 'summarize',
-    iconColor: 'text-tertiary',
-    title: 'Raport Hydraulika Q4 2023',
-    description: 'Hydraulika, Wszystkie statusy',
-    generatedAt: '12.01.2024, 11:05',
-  },
-  {
-    id: 4,
-    icon: 'bar_chart',
-    iconColor: 'text-on-surface-variant',
-    title: 'Raport Roczny 2023',
-    description: 'Wszystkie kategorie, Wszystkie statusy',
-    generatedAt: '03.01.2024, 08:30',
-  },
-];
-
-const TICKETS_LIST = [
-  {
-    id: 1,
-    title: 'Uszkodzony panel LED',
-    category: 'Elektryka',
-    status: 'IN_PROGRESS',
-    priority: 'HIGH',
-    assignee: 'Jan Kowalski',
-    date: '2024-05-07',
-    auditLog: [
-      { date: '2024-05-07 10:00', user: 'Jan Kowalski', action: 'Zmieniono status na W TRAKCIE' },
-      { date: '2024-05-07 09:00', user: 'System', action: 'Utworzono zgłoszenie' }
-    ]
-  },
-  {
-    id: 2,
-    title: 'Wykryto wyciek wody',
-    category: 'Hydraulika',
-    status: 'NEW',
-    priority: 'CRITICAL',
-    assignee: '',
-    date: '2024-05-07',
-    auditLog: [
-      { date: '2024-05-07 11:30', user: 'System', action: 'Utworzono zgłoszenie' }
-    ]
-  },
-  {
-    id: 3,
-    title: 'Brak internetu na 2 piętrze',
-    category: 'Infrastruktura IT',
-    status: 'RESOLVED',
-    priority: 'MEDIUM',
-    assignee: 'Anna Nowak',
-    date: '2024-05-06',
-    auditLog: [
-      { date: '2024-05-07 08:15', user: 'Anna Nowak', action: 'Zmieniono status na ROZWIĄZANE', note: 'Zrestartowano switch' },
-      { date: '2024-05-06 14:00', user: 'Anna Nowak', action: 'Zmieniono status na W TRAKCIE' },
-      { date: '2024-05-06 13:00', user: 'System', action: 'Utworzono zgłoszenie' }
-    ]
-  }
 ];
 
 const STATUS_MAP = {
@@ -114,6 +54,23 @@ const PRIORITY_MAP = {
   MEDIUM: { label: 'Średni', color: 'text-primary' },
   HIGH: { label: 'Wysoki', color: 'text-tertiary' },
   CRITICAL: { label: 'Krytyczny', color: 'text-error font-bold' }
+};
+
+const MOCK_COORDINATORS = [
+  { id: 'mock1', first_name: 'Jan', last_name: 'Kowalski' },
+  { id: 'mock2', first_name: 'Anna', last_name: 'Nowak' },
+  { id: 'mock3', first_name: 'Piotr', last_name: 'Wiśniewski' }
+];
+
+const formatDate = (isoString) => {
+    if (!isoString) return '—';
+    return new Date(isoString).toLocaleDateString('pl-PL', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 };
 
 /* ── Sub-components ── */
@@ -218,19 +175,101 @@ function ReportRow({ report, dateFrom, dateTo }) {
   );
 }
 
-function TicketRow({ ticket }) {
+function TicketRow({ ticket, coordinators, onTicketUpdated }) {
   const [expanded, setExpanded] = useState(false);
-  const [status, setStatus] = useState(ticket.status);
-  const [priority, setPriority] = useState(ticket.priority);
-  const [assignee, setAssignee] = useState(ticket.assignee);
+  const [status, setStatus] = useState(ticket.status || 'NEW');
+  const [priority, setPriority] = useState(ticket.priority || 'MEDIUM');
+  const [assignee, setAssignee] = useState(ticket.assigned_to?.id || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [closingNote, setClosingNote] = useState('');
 
-  const hasChanges = status !== ticket.status || priority !== ticket.priority || assignee !== ticket.assignee;
+  // Sync state if ticket props update
+  useEffect(() => {
+      setStatus(ticket.status || 'NEW');
+      setPriority(ticket.priority || 'MEDIUM');
+      setAssignee(ticket.assigned_to?.id || '');
+  }, [ticket]);
 
-  const handleSave = (e) => {
+  const hasChanges = status !== ticket.status || priority !== ticket.priority || assignee !== (ticket.assigned_to?.id || '');
+  const isClosed = ticket.status === 'CLOSED';
+
+  const handleSave = async (e) => {
     e.stopPropagation();
-    // Tutaj w przyszłości pójdzie PATCH
-    console.log('PATCH z danymi:', { id: ticket.id, status, priority, assignee });
-    alert('Zmiany zapisane (MOCK)');
+    setIsSaving(true);
+    try {
+        const payload = {
+            status,
+            priority,
+            // assigned_to_id: assignee || null // Omitted as per user request (mock data vs backend validation)
+        };
+        const res = await api.patch(`tickets/${ticket.id}/`, payload);
+        onTicketUpdated(res.data);
+    } catch (err) {
+        console.error("Błąd podczas zapisu:", err);
+        alert("Wystąpił błąd podczas zapisywania zmian.");
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  const getPriorityColor = (prio) => {
+    return PRIORITY_MAP[prio]?.color || PRIORITY_MAP['MEDIUM'].color;
+  };
+
+  const getStatusColor = (stat) => {
+    return STATUS_MAP[stat]?.color || STATUS_MAP['NEW'].color;
+  };
+
+  const auditLog = ticket.audit_log || [];
+
+  const getLogDisplay = (log) => {
+    if (log.field_changed === 'note') {
+       return {
+          title: 'Dodano notatkę',
+          content: <span className="font-italic text-on-surface">"{log.new_value}"</span>
+       };
+    }
+    
+    if (log.field_changed === 'assigned_to') {
+       const getMockName = (id) => {
+         if (!id || id === 'None' || id === 'null') return '';
+         const c = MOCK_COORDINATORS.find(m => m.id === id);
+         return c ? `${c.first_name} ${c.last_name}` : 'Nieznany użytkownik';
+       };
+       const oldName = getMockName(log.old_value);
+       const newName = getMockName(log.new_value);
+       
+       if (!oldName) {
+           return {
+             title: 'Przypisano zgłoszenie',
+             content: <>do <span className="font-bold text-primary">{newName}</span></>
+           };
+       } else if (!newName) {
+           return {
+             title: 'Usunięto przypisanie',
+             content: <>było <span className="line-through">{oldName}</span></>
+           };
+       } else {
+           return {
+             title: 'Zmieniono przypisanie',
+             content: <>z <span className="line-through">{oldName}</span> na <span className="font-bold text-primary">{newName}</span></>
+           };
+       }
+    }
+    
+    const fieldNameMap = { status: 'status', priority: 'priorytet' };
+    const name = fieldNameMap[log.field_changed] || log.field_changed;
+    
+    const formatVal = (val, field) => {
+       if (field === 'status') return STATUS_MAP[val]?.label || val;
+       if (field === 'priority') return PRIORITY_MAP[val]?.label || val;
+       return val;
+    };
+    
+    return {
+       title: `Zmieniono ${name}`,
+       content: <>z <span className="line-through">{formatVal(log.old_value, log.field_changed)}</span> na <span className="font-bold text-primary">{formatVal(log.new_value, log.field_changed)}</span></>
+    };
   };
 
   return (
@@ -239,9 +278,9 @@ function TicketRow({ ticket }) {
         <div className="flex-1">
           <h3 className="font-bold text-on-surface">{ticket.title}</h3>
           <div className="flex flex-wrap items-center gap-2 text-xs font-medium mt-1">
-            <span className="text-on-surface-variant">{ticket.date}</span>
+            <span className="text-on-surface-variant">{formatDate(ticket.created_at)}</span>
             <span className="mx-1 text-outline-variant">•</span>
-            <span className="text-on-surface-variant">{ticket.category}</span>
+            <span className="text-on-surface-variant">{ticket.category?.name || 'Inne'}</span>
           </div>
         </div>
         
@@ -249,50 +288,62 @@ function TicketRow({ ticket }) {
            <div className="relative group cursor-pointer" title="Zmień status">
              <select 
                 value={status} 
-                onChange={(e) => setStatus(e.target.value)}
-                className={`text-xs font-bold uppercase rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none cursor-pointer hover:shadow-sm transition-shadow ${STATUS_MAP[status]?.color}`}
+                onChange={(e) => {
+                  const newStatus = e.target.value;
+                  setStatus(newStatus);
+                  if (newStatus === 'RESOLVED') {
+                    setExpanded(true);
+                  }
+                }}
+                disabled={isClosed}
+                className={`text-xs font-bold uppercase rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none hover:shadow-sm transition-shadow ${getStatusColor(status)} ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
              >
-               {Object.entries(STATUS_MAP).map(([k, v]) => (
+               {Object.entries(STATUS_MAP)
+                 .filter(([k]) => k !== 'CLOSED' || isClosed)
+                 .map(([k, v]) => (
                  <option key={k} value={k} className="bg-surface text-on-surface uppercase">{v.label}</option>
                ))}
              </select>
-             <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>
+             {!isClosed && <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>}
            </div>
 
            <div className="relative group cursor-pointer" title="Zmień priorytet">
              <select 
                 value={priority} 
                 onChange={(e) => setPriority(e.target.value)}
-                className={`text-xs font-bold rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none cursor-pointer hover:shadow-sm transition-shadow ${PRIORITY_MAP[priority]?.color}`}
+                disabled={isClosed}
+                className={`text-xs font-bold rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none hover:shadow-sm transition-shadow ${getPriorityColor(priority)} ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
              >
                {Object.entries(PRIORITY_MAP).map(([k, v]) => (
                  <option key={k} value={k} className="bg-surface text-on-surface">{v.label}</option>
                ))}
              </select>
-             <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>
+             {!isClosed && <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>}
            </div>
 
            <div className="relative group cursor-pointer" title="Zmień przypisanie">
              <select
                value={assignee}
                onChange={(e) => setAssignee(e.target.value)}
-               className="text-xs font-medium rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none cursor-pointer bg-surface-container-low text-on-surface hover:shadow-sm transition-shadow"
+               disabled={isClosed}
+               className={`text-xs font-medium rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none bg-surface-container-low text-on-surface hover:shadow-sm transition-shadow max-w-[150px] truncate ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
              >
                <option value="">Nieprzypisane</option>
-               <option value="Jan Kowalski">Jan Kowalski</option>
-               <option value="Anna Nowak">Anna Nowak</option>
-               <option value="Piotr Wiśniewski">Piotr Wiśniewski</option>
+               {coordinators.map(c => (
+                   <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+               ))}
              </select>
-             <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>
+             {!isClosed && <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>}
            </div>
 
-           {hasChanges && (
+           {hasChanges && !isClosed && (
              <button 
-               className="px-3 py-1 bg-primary text-on-primary text-xs font-bold rounded-lg hover:scale-[0.98] transition-transform shadow-sm flex items-center gap-1"
+               className="px-3 py-1 bg-primary text-on-primary text-xs font-bold rounded-lg hover:scale-[0.98] transition-transform shadow-sm flex items-center gap-1 disabled:opacity-50"
                onClick={handleSave}
                title="Zapisz zmiany"
+               disabled={isSaving}
              >
-               <span className="material-symbols-outlined text-[14px]">save</span>
+               <span className="material-symbols-outlined text-[14px]">{isSaving ? 'sync' : 'save'}</span>
                Zapisz
              </button>
            )}
@@ -310,28 +361,75 @@ function TicketRow({ ticket }) {
           <div>
              <h4 className="text-sm font-bold text-on-surface mb-3">Historia zgłoszenia (AuditLog)</h4>
              <div className="flex flex-col gap-3 pl-2 border-l-2 border-outline-variant ml-2">
-               {ticket.auditLog.map((log, idx) => (
-                 <div key={idx} className="relative pl-4">
+               {auditLog.length > 0 ? auditLog.map((log) => {
+                 const display = getLogDisplay(log);
+                 return (
+                 <div key={log.id} className="relative pl-4">
                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-primary/40 border-2 border-surface" />
-                   <div className="text-xs font-medium text-on-surface-variant mb-0.5">{log.date} • {log.user}</div>
-                   <div className="text-sm text-on-surface">{log.action}</div>
-                   {log.note && <div className="text-xs text-on-surface-variant mt-1 p-2 bg-surface-container rounded-lg border border-outline">{log.note}</div>}
+                   <div className="text-xs font-medium text-on-surface-variant mb-0.5">
+                       {formatDate(log.created_at)} • {log.user?.first_name} {log.user?.last_name}
+                   </div>
+                   <div className="text-sm text-on-surface font-semibold">{display.title}</div>
+                   <div className="text-xs text-on-surface-variant mt-1 p-2 bg-surface-container rounded-lg border border-outline">
+                       {display.content}
+                   </div>
                  </div>
-               ))}
+                 );
+               }) : (
+                 <div className="text-xs text-on-surface-variant italic">Brak historii zmian.</div>
+               )}
              </div>
           </div>
-          {status === 'RESOLVED' && (
-             <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-outline-variant">
+          
+          {ticket.status === 'CLOSED' && (
+              <div className="mt-2 pt-4 border-t border-outline-variant text-sm text-on-surface-variant italic text-center">
+                  Zgłoszenie jest zamknięte i nie można go już edytować.
+              </div>
+          )}
+
+          {status === 'RESOLVED' && !isClosed && (
+             <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-outline-variant" onClick={(e) => e.stopPropagation()}>
                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                 Notatka rozwiązująca (wymagana)
+                 Notatka rozwiązująca (wymagana do zamknięcia)
                </label>
                <textarea 
+                 value={closingNote}
+                 onChange={(e) => setClosingNote(e.target.value)}
                  className="w-full p-3 rounded-lg border border-outline focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm bg-surface resize-none"
                  rows="2" 
                  placeholder="Wpisz notatkę z rozwiązaniem problemu..." 
                />
-               <button className="self-end px-4 py-2 bg-primary text-on-primary rounded-xl text-sm font-bold hover:scale-[0.98] transition-transform">
-                 Zapisz notatkę
+               <button 
+                 onClick={async (e) => {
+                   e.stopPropagation();
+                   if (!closingNote.trim()) {
+                     alert("Notatka zamykająca jest wymagana!");
+                     return;
+                   }
+                   setIsSaving(true);
+                   try {
+                     const payload = {
+                       status: 'CLOSED',
+                       priority,
+                                               // assigned_to_id: assignee || null,
+                       note: closingNote
+                     };
+                     const res = await api.patch(`tickets/${ticket.id}/`, payload);
+                     
+                     onTicketUpdated(res.data);
+                     setExpanded(false);
+                     setClosingNote('');
+                   } catch (err) {
+                     console.error("Błąd podczas zapisu:", err);
+                     alert("Wystąpił błąd podczas zamykania zgłoszenia.");
+                   } finally {
+                     setIsSaving(false);
+                   }
+                 }}
+                 disabled={!closingNote.trim() || isSaving}
+                 className="self-end px-4 py-2 bg-primary text-on-primary rounded-xl text-sm font-bold hover:scale-[0.98] transition-transform disabled:opacity-50"
+               >
+                 {isSaving ? 'Zamykanie...' : 'Zapisz notatkę i zamknij zgłoszenie'}
                </button>
              </div>
           )}
@@ -346,33 +444,64 @@ export default function CoordinatorPanel() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [tickets, setTickets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 10;
 
   // Filtry do sekcji biletów
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sortPriority, setSortPriority] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const PRIORITY_WEIGHT = {
-    LOW: 1,
-    MEDIUM: 2,
-    HIGH: 3,
-    CRITICAL: 4
+  const fetchTickets = async () => {
+    setIsLoading(true);
+    try {
+        const offset = (currentPage - 1) * pageSize;
+        const params = new URLSearchParams({
+            limit: pageSize,
+            offset: offset,
+        });
+
+        if (statusFilter) params.append('status', statusFilter);
+        if (priorityFilter) params.append('priority', priorityFilter);
+        if (searchQuery) params.append('search', searchQuery);
+        if (dateFrom) params.append('date_from', dateFrom);
+        if (dateTo) params.append('date_to', dateTo);
+        if (sortPriority) {
+           const prefix = sortPriority === 'desc' ? '-' : '';
+           params.append('ordering', `${prefix}priority`);
+        } else {
+           params.append('ordering', '-created_at');
+        }
+
+        const res = await api.get(`tickets/?${params.toString()}`);
+        setTickets(res.data.results || []);
+        setTotalCount(res.data.count || 0);
+    } catch (err) {
+        console.error("Błąd podczas pobierania danych:", err);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
-  const filteredTickets = TICKETS_LIST.filter(ticket => {
-    if (statusFilter && ticket.status !== statusFilter) return false;
-    if (priorityFilter && ticket.priority !== priorityFilter) return false;
-    return true;
-  });
+  useEffect(() => {
+      fetchTickets();
+  }, [currentPage, statusFilter, priorityFilter, searchQuery, dateFrom, dateTo, sortPriority]);
 
-  const sortedAndFilteredTickets = [...filteredTickets].sort((a, b) => {
-    if (sortPriority === 'desc') {
-      return (PRIORITY_WEIGHT[b.priority] || 0) - (PRIORITY_WEIGHT[a.priority] || 0);
-    } else if (sortPriority === 'asc') {
-      return (PRIORITY_WEIGHT[a.priority] || 0) - (PRIORITY_WEIGHT[b.priority] || 0);
-    }
-    return 0;
-  });
+  // Reset page when filters change
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [statusFilter, priorityFilter, searchQuery, dateFrom, dateTo, sortPriority]);
+
+  const handleTicketUpdated = (updatedTicket) => {
+      // Refresh the entire list from server to ensure sorting/pagination/filtering is consistent
+      fetchTickets();
+  };
+
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
     <main className="flex-1 overflow-y-auto p-6 lg:p-10 scrollbar-thin">
@@ -565,31 +694,69 @@ export default function CoordinatorPanel() {
 
           {/* Ticket items */}
           <div className="flex flex-col gap-3">
-            {sortedAndFilteredTickets.length > 0 ? (
-              sortedAndFilteredTickets.map((ticket) => (
-                <TicketRow key={ticket.id} ticket={ticket} />
-              ))
+            {isLoading ? (
+               <div className="text-center py-12 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed">
+                 Ładowanie danych z serwera...
+               </div>
+            ) : tickets.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {tickets.map((ticket) => (
+                  <TicketRow key={ticket.id} ticket={ticket} coordinators={MOCK_COORDINATORS} onTicketUpdated={handleTicketUpdated} />
+                ))}
+                
+                {/* ── Pagination Footer ── */}
+                <div className="mt-8 pt-6 border-t border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <p className="text-sm text-on-surface-variant">
+                    Pokazano <span className="font-bold text-on-surface">{Math.min(totalCount, (currentPage - 1) * pageSize + 1)} - {Math.min(totalCount, currentPage * pageSize)}</span> z <span className="font-bold text-on-surface">{totalCount}</span> zgłoszeń
+                  </p>
+                  
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1 || isLoading}
+                      className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline hover:bg-surface-container transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <span className="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    
+                    {[...Array(totalPages)].map((_, i) => {
+                        const pageNum = i + 1;
+                        // Simple logic to show only some pages if too many
+                        if (totalPages > 7 && (pageNum > 2 && pageNum < totalPages - 1 && Math.abs(pageNum - currentPage) > 1)) {
+                            if (pageNum === 3 || pageNum === totalPages - 2) return <span key={pageNum} className="px-2">...</span>;
+                            return null;
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm transition-all ${
+                              currentPage === pageNum 
+                              ? 'bg-primary text-on-primary' 
+                              : 'hover:bg-surface-container text-on-surface'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                    })}
+                    
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages || totalPages === 0 || isLoading}
+                      className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline hover:bg-surface-container transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <span className="material-symbols-outlined">chevron_right</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
-              <div className="text-center py-8 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed">
-                Brak zgłoszeń spełniających wybrane filtry.
+              <div className="text-center py-12 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed">
+                Brak zgłoszeń spełniających wybrane kryteria.
               </div>
             )}
-          </div>
-
-          {/* Pagination mockup */}
-          <div className="mt-6 flex items-center justify-between pt-4 border-t border-outline-variant text-sm font-medium text-on-surface-variant">
-            <span>Pokazuję 1-3 z 24 zgłoszeń</span>
-            <div className="flex items-center gap-1">
-              <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container text-on-surface transition-colors">
-                <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-              </button>
-              <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-on-primary font-bold shadow-sm">1</button>
-              <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container text-on-surface transition-colors">2</button>
-              <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container text-on-surface transition-colors">3</button>
-              <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container text-on-surface transition-colors">
-                <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-              </button>
-            </div>
           </div>
         </section>
       </div>

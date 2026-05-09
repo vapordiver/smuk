@@ -1,4 +1,4 @@
-from rest_framework import generics, viewsets, mixins, status
+from rest_framework import generics, viewsets, mixins, status, filters
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
@@ -45,9 +45,10 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
     `GET /api/tickets/my/`   (get_my_tickets)
     `POST /api/tickets/`     (create)
     """
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, OrderingFilter, filters.SearchFilter]
     filterset_class = TicketFilter
     ordering_fields = ['created_at', 'priority', 'status']
+    search_fields = ['title', 'description', 'id']
 
     def handle_exception(self, exc):
         response = super().handle_exception(exc)
@@ -191,6 +192,14 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                     old_value=str(old_assigned) if old_assigned else None,
                     new_value=str(new_assigned) if new_assigned else None
                 )
+
+        if 'note' in serializer.validated_data and serializer.validated_data['note']:
+            AuditLog.objects.create(
+                ticket=ticket,
+                user=request.user,
+                field_changed='note',
+                new_value=serializer.validated_data['note']
+            )
 
         output_serializer = TicketDetailSerializer(ticket)
         return Response(output_serializer.data)

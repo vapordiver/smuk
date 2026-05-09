@@ -52,12 +52,14 @@ class TicketListSerializer(serializers.ModelSerializer):
     category = FaultCategorySerializer(read_only=True)
     building = BuildingSerializer(read_only=True)
     reporter = UserShortSerializer(read_only=True)
+    assigned_to = UserShortSerializer(read_only=True)
+    audit_log = AuditLogEntrySerializer(source="audit_logs", many=True, read_only=True)
 
     class Meta:
         model = Ticket
         fields = [
             "id", "title", "description", "status", "priority", "category",
-            "building", "floor", "room", "reporter", "location", "image", "created_at"
+            "building", "floor", "room", "reporter", "assigned_to", "location", "image", "created_at", "audit_log"
         ]
 
 
@@ -195,10 +197,11 @@ class TicketUpdateSerializer(serializers.ModelSerializer):
     Serializer used for updating ticket status, priority, and assigned_to (PATCH /api/tickets/<id>/).
     """
     assigned_to_id = serializers.UUIDField(required=False, allow_null=True)
+    note = serializers.CharField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = Ticket
-        fields = ["status", "priority", "assigned_to_id"]
+        fields = ["status", "priority", "assigned_to_id", "note"]
 
     def validate_assigned_to_id(self, value):
         from django.contrib.auth import get_user_model
