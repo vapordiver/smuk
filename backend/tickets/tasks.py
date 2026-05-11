@@ -1,5 +1,4 @@
 from celery import shared_task
-from django.utils import timezone
 from datetime import timedelta
 from django.contrib.gis.measure import D
 from .models import Ticket, AuditLog
@@ -18,6 +17,9 @@ def calculate_priority(ticket_id):
         return
     
     if ticket.priority != Ticket.Priority.LOW:
+        return
+
+    if not ticket.location:
         return
 
     window_start = ticket.created_at - timedelta(days=PRIORITY_WINDOW_DAYS)
