@@ -32,7 +32,7 @@ def calculate_priority(ticket_id):
     if new_priority != ticket.priority:
         old_priority = ticket.priority
         ticket.priority = new_priority
-        ticket.save(update_fields=['priority','updated_at'])
+        ticket.save(update_fields=['priority', 'updated_at'])
 
         AuditLog.objects.create(
             ticket=ticket,

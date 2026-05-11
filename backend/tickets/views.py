@@ -126,12 +126,12 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         # compress image (Pillow -> WEBP)
         try:
             compressed_image = compress_image_to_webp(serializer.validated_data["image"])
-        except ValueError as e:
+        except ValueError:
             return Response(
                 {
                     "error": {
                         "code": "IMAGE_PROCESSING_ERROR",
-                        "message": str(e),
+                        "message": "Unable to process the uploaded image.",
                     }
                 },
                 status=status.HTTP_400_BAD_REQUEST,
