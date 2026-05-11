@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, viewsets, mixins, status, filters
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -11,6 +13,8 @@ from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDeta
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
 from .tasks import calculate_priority
+
+logger = logging.getLogger(__name__)
 
 
 class BuildingsListView(generics.ListAPIView):
@@ -127,6 +131,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         try:
             compressed_image = compress_image_to_webp(serializer.validated_data["image"])
         except ValueError:
+            logger.exception("Image processing failed during ticket creation")
             return Response(
                 {
                     "error": {
