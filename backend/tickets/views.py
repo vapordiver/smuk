@@ -4,11 +4,13 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db import transaction
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
 from .models import Building, FaultCategory, Ticket
 from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
+from .tasks import calculate_priority
 
 
 class BuildingsListView(generics.ListAPIView):
@@ -135,17 +137,20 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ticket = Ticket.objects.create(
-            title=serializer.validated_data["title"],
-            description=serializer.validated_data["description"],
-            category_id=serializer.validated_data["category_id"],
-            building_id=serializer.validated_data.get("building_id"),
-            # floor=serializer.validated_data.get("floor"),
-            # room=serializer.validated_data.get("room", ""),
-            location=serializer.validated_data["_point"],
-            image=compressed_image,
-            reporter=request.user,
-        )
+        with transaction.atomic():
+            ticket = Ticket.objects.create(
+                title=serializer.validated_data["title"],
+                description=serializer.validated_data["description"],
+                category_id=serializer.validated_data["category_id"],
+                building_id=serializer.validated_data.get("building_id"),
+                # floor=serializer.validated_data.get("floor"),
+                # room=serializer.validated_data.get("room", ""),
+                location=serializer.validated_data["_point"],
+                image=compressed_image,
+                reporter=request.user,
+            )
+
+            transaction.on_commit(lambda: calculate_priority.delay(ticket.id))
 
         output_serializer = TicketDetailSerializer(ticket)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
@@ -202,4 +207,4 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             )
 
         output_serializer = TicketDetailSerializer(ticket)
-        return Response(output_serializer.data)
+        return Response(output_serializer.data)
