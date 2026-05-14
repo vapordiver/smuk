@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import ImpactButton from '../common/ImpactButton';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * SideNavBar – Click-toggle sidebar overlay
@@ -9,9 +10,6 @@ import ImpactButton from '../common/ImpactButton';
  *
  * @param {{ isOpen: boolean, onClose: () => void }} props
  */
-
-// MOCK — zmień na AuthContext w SMUK-7
-const userRole = 'COORDINATOR'; // 'COORDINATOR' | 'REPORTER'
 
 const NAV_ITEMS = [
   { to: '/', icon: 'dashboard', label: 'Dashboard' },
@@ -46,6 +44,9 @@ function NavLink({ to, icon, label, isActive, onClick }) {
 
 export default function SideNavBar({ isOpen, onClose }) {
   const location = useLocation();
+  const { user } = useAuth();
+  
+  const userRole = user?.role || 'REPORTER';
 
   const roleLink = userRole === 'COORDINATOR'
     ? { to: '/admin', icon: 'admin_panel_settings', label: 'Analiza zgłoszeń' }

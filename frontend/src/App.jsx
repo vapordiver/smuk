@@ -56,8 +56,10 @@ export default function App() {
                         <Route element={<ProtectedRoute/>}>
                             <Route path="/report" element={<ReportForm/>}/>
                             <Route path="/my-tickets" element={<MyTickets/>}/>
-                            <Route path="/admin" element={<CoordinatorPanel/>}/>
                             <Route path="/profile" element={<ProfilePage/>}/>
+                        </Route>
+                        <Route element={<ProtectedRoute allowedRoles={['COORDINATOR']}/>}>
+                            <Route path="/admin" element={<CoordinatorPanel/>}/>
                         </Route>
                     </Route>
                     {/* Auth routes – no sidebar */}

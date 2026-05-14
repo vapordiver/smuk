@@ -1,8 +1,8 @@
 import {Navigate, Outlet, useLocation} from 'react-router-dom';
 import {useAuth} from "../../context/AuthContext";
 
-export default function ProtectedRoute() {
-    const {isAuthenticated, isLoading} = useAuth();
+export default function ProtectedRoute({ allowedRoles }) {
+    const {isAuthenticated, isLoading, user} = useAuth();
     const location = useLocation();
 
     if (isLoading) {
@@ -16,6 +16,14 @@ export default function ProtectedRoute() {
     //if user isn't logged in redirect to /login AND save where he wanted to go (state from location)
     if (!isAuthenticated) {
         return <Navigate to="/login" state={{from: location}} replace/>;
+    }
+
+    // Check if user has required role
+    if (allowedRoles && allowedRoles.length > 0) {
+        const userRole = user?.role || 'REPORTER';
+        if (!allowedRoles.includes(userRole)) {
+            return <Navigate to="/" replace/>;
+        }
     }
 
     return <Outlet/>;
