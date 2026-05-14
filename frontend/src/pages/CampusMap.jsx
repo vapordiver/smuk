@@ -84,11 +84,16 @@ export default function CampusMap() {
             <MapContainer
                 center={CAMPUS_CENTER}
                 zoom={DEFAULT_ZOOM}
+                maxZoom={22}
                 className="flex-1 w-full z-0"
                 scrollWheelZoom={true}
                 tap={false}
             >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    maxZoom={22}
+                    maxNativeZoom={19}
+                />
                 <MapDataLoader onFeaturesLoaded={setFeatures}/>
                 {campuses.map(campus => campus.polygon && (
                     <Polygon
@@ -107,7 +112,6 @@ export default function CampusMap() {
                 iconCreateFunction={createClusterIcon}
                 zoomToBoundsOnClick={true}
                 spiderfyOnMaxZoom={true}
-                disableClusteringAtZoom={18}
                 spiderfyDistanceMultiplier={1.5}
                 maxClusterRadius={60}
                 removeOutsideVisibleBounds={false}
