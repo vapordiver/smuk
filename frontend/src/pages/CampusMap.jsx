@@ -115,7 +115,8 @@ export default function CampusMap() {
                 spiderfyDistanceMultiplier={1.5}
                 maxClusterRadius={60}
                 removeOutsideVisibleBounds={false}
-            > 
+                showCoverageOnHover={false}
+                >
                     {features.map(feature => {
                         const {coordinates} = feature.geometry;
                         const props = feature.properties;
