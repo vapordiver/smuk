@@ -58,7 +58,7 @@ export default function App() {
                             <Route path="/my-tickets" element={<MyTickets/>}/>
                             <Route path="/profile" element={<ProfilePage/>}/>
                         </Route>
-                        <Route element={<ProtectedRoute allowedRoles={['COORDINATOR']}/>}>
+                        <Route element={<ProtectedRoute allowedRoles={['coordinator']}/>}>
                             <Route path="/admin" element={<CoordinatorPanel/>}/>
                         </Route>
                     </Route>

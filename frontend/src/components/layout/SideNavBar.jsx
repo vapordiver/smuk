@@ -46,9 +46,9 @@ export default function SideNavBar({ isOpen, onClose }) {
   const location = useLocation();
   const { user } = useAuth();
   
-  const userRole = user?.role || 'REPORTER';
+  const userRole = user?.role || 'reporter';
 
-  const roleLink = userRole === 'COORDINATOR'
+  const roleLink = userRole === 'coordinator'
     ? { to: '/admin', icon: 'admin_panel_settings', label: 'Analiza zgłoszeń' }
     : null;
 

@@ -56,11 +56,7 @@ const PRIORITY_MAP = {
   CRITICAL: { label: 'Krytyczny', color: 'text-error font-bold' }
 };
 
-const MOCK_COORDINATORS = [
-  { id: 'mock1', first_name: 'Jan', last_name: 'Kowalski' },
-  { id: 'mock2', first_name: 'Anna', last_name: 'Nowak' },
-  { id: 'mock3', first_name: 'Piotr', last_name: 'Wiśniewski' }
-];
+// Removed MOCK_COORDINATORS
 
 const formatDate = (isoString) => {
     if (!isoString) return '—';
@@ -200,7 +196,7 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
         const payload = {
             status,
             priority,
-            // assigned_to_id: assignee || null // Omitted as per user request (mock data vs backend validation)
+            assigned_to_id: assignee || null
         };
         const res = await api.patch(`tickets/${ticket.id}/`, payload);
         onTicketUpdated(res.data);
@@ -233,7 +229,7 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
     if (log.field_changed === 'assigned_to') {
        const getMockName = (id) => {
          if (!id || id === 'None' || id === 'null') return '';
-         const c = MOCK_COORDINATORS.find(m => m.id === id);
+         const c = coordinators.find(m => m.id === id);
          return c ? `${c.first_name} ${c.last_name}` : 'Nieznany użytkownik';
        };
        const oldName = getMockName(log.old_value);
@@ -411,7 +407,7 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                      const payload = {
                        status: 'CLOSED',
                        priority,
-                                               // assigned_to_id: assignee || null,
+                       assigned_to_id: assignee || null,
                        note: closingNote
                      };
                      const res = await api.patch(`tickets/${ticket.id}/`, payload);
@@ -445,6 +441,7 @@ export default function CoordinatorPanel() {
   const [dateTo, setDateTo] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [tickets, setTickets] = useState([]);
+  const [coordinators, setCoordinators] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -490,6 +487,18 @@ export default function CoordinatorPanel() {
   useEffect(() => {
       fetchTickets();
   }, [currentPage, statusFilter, priorityFilter, searchQuery, dateFrom, dateTo, sortPriority]);
+
+  useEffect(() => {
+      const fetchCoordinators = async () => {
+          try {
+              const res = await api.get('auth/coordinators/');
+              setCoordinators(res.data);
+          } catch (err) {
+              console.error("Błąd pobierania koordynatorów:", err);
+          }
+      };
+      fetchCoordinators();
+  }, []);
 
   // Reset page when filters change
   useEffect(() => {
@@ -701,7 +710,7 @@ export default function CoordinatorPanel() {
             ) : tickets.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {tickets.map((ticket) => (
-                  <TicketRow key={ticket.id} ticket={ticket} coordinators={MOCK_COORDINATORS} onTicketUpdated={handleTicketUpdated} />
+                  <TicketRow key={ticket.id} ticket={ticket} coordinators={coordinators} onTicketUpdated={handleTicketUpdated} />
                 ))}
                 
                 {/* ── Pagination Footer ── */}

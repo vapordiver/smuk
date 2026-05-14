@@ -20,7 +20,7 @@ export default function ProtectedRoute({ allowedRoles }) {
 
     // Check if user has required role
     if (allowedRoles && allowedRoles.length > 0) {
-        const userRole = user?.role || 'REPORTER';
+        const userRole = user?.role || 'reporter';
         if (!allowedRoles.includes(userRole)) {
             return <Navigate to="/" replace/>;
         }
