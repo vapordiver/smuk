@@ -5,18 +5,9 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from '../services/api';
 import StatusBadge from '../components/common/StatusBadge';
+import '../utils/leafletSetup';
+import {formatDate, PRIORITY_LABELS} from '../utils/formatters';
 
-// leaflet icon fix
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconUrl: markerIcon,
-    iconRetinaUrl: markerIcon2x,
-    shadowUrl: markerShadow,
-});
 
 const mapStatusToBadge = (apiStatus) => {
     const statusMap = {
@@ -28,27 +19,6 @@ const mapStatusToBadge = (apiStatus) => {
         'ARCHIVED': 'rejected',
     };
     return statusMap[apiStatus] || 'new';
-};
-
-const mapPriorityToPolish = (priority) => {
-    const priorityMap = {
-        'LOW': 'Niski',
-        'MEDIUM': 'Średni',
-        'HIGH': 'Wysoki',
-        'CRITICAL': 'Krytyczny',
-    };
-    return priorityMap[priority] || priority;
-};
-
-const formatDate = (isoString) => {
-    if (!isoString) return '—';
-    return new Date(isoString).toLocaleDateString('pl-PL', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
 };
 
 const getImageUrl = (imagePath) => {
@@ -150,10 +120,10 @@ const TicketModal = ({ticket, onClose}) => {
                                     ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL'
                                         ? 'bg-red-100 text-red-700 border-red-200'
                                         : ticket.priority === 'MEDIUM'
-                                            ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                    ? 'bg-orange-100 text-orange-700 border-orange-200'
                                             : 'bg-emerald-100 text-emerald-700 border-emerald-200'
                                 }`}>
-                                Priorytet: {mapPriorityToPolish(ticket.priority)}
+                                Priorytet: {PRIORITY_LABELS[ticket.priority] || ticket.priority}
                             </div>
                         )}
                     </div>
@@ -302,7 +272,7 @@ export default function MyTickets() {
     }), [tickets]);
 
     return (
-        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend']">
+        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend_Variable']">
             <div className="mb-3 shrink-0">
                 <p className="text-primary text-xl font-bold text-slate-900 mb-2">
                     {isCoordinator ? "Panel Koordynatora" : "Podsumowanie konta"}

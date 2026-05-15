@@ -72,50 +72,55 @@ class Command(BaseCommand):
         reporter2.groups.add(reporter_group)
 
         # 3. Fetch dependencies (Building, Category)
-        building = Building.objects.first()
-        category = FaultCategory.objects.first()
-        point1 = Point(19.9123, 50.0654, srid=4326)
+        building_a10 = Building.objects.filter(name__icontains='A10').first()
+        building_c3 = Building.objects.filter(name__icontains='C3').first()
+        # B18 building fallback to A1 if missing
+        building_b18 = Building.objects.filter(name__icontains='B18').first() or Building.objects.filter(name__icontains='A1').first()
+
+        category_water = FaultCategory.objects.filter(name='Instalacja wodna').first()
+        category_elec = FaultCategory.objects.filter(name='Elektryka').first()
+        category_heat = FaultCategory.objects.filter(name='Ogrzewanie').first()
 
         # Abort if required foreign keys are missing 
-        if not building or not category:
+        if not building_a10 or not building_c3 or not category_elec:
             raise CommandError(
                 "Missing Building or FaultCategory in the database! "
                 "Please create them first before running this script."
             )
 
         # 4. Create Tickets
-        # Ticket 1 (Reporter 1)
+        # Ticket 1 (Reporter 1) - A10 Elektryka
         t1 = Ticket.objects.create(
-            title="Cieknący kran w C-4",
-            description="Całą noc kapie woda.",
-            location=point1,
-            building=building,
-            category=category,
+            title="Uszkodzone gniazdko w sali komputerowej",
+            description="Jedno z gniazdek w sali 102 jest poluzowane i iskrzy przy podłączaniu zasilacza. Proszę o pilną naprawę ze względów bezpieczeństwa.",
+            location=building_a10.centroid,
+            building=building_a10,
+            category=category_elec,
             reporter=reporter1,
-            priority=Ticket.Priority.MEDIUM,
+            priority=Ticket.Priority.HIGH,
             status=Ticket.Status.NEW
         )
 
-        # Ticket 2 (Reporter 1, assigned to Coordinator)
+        # Ticket 2 (Reporter 1, assigned to Coordinator) - C3 Instalacja wodna
         t2 = Ticket.objects.create(
-            title="Problem z projektorem",
-            description="Lampa mruga na żółto.",
-            location=point1,
-            building=building,
-            category=category,
+            title="Cieknący kran w łazience na parterze",
+            description="Z kranu w męskiej toalecie cały czas kapie woda, nie da się go do końca zakręcić. Zbiera się woda na podłodze.",
+            location=building_c3.centroid,
+            building=building_c3,
+            category=category_water,
             reporter=reporter1,
             assigned_to=coordinator1,
-            priority=Ticket.Priority.HIGH,
+            priority=Ticket.Priority.MEDIUM,
             status=Ticket.Status.IN_PROGRESS
         )
 
-        # Ticket 3 (Reporter 2 - should be hidden from Reporter 1 based on Permissions)
+        # Ticket 3 (Reporter 2) - B18 Ogrzewanie
         t3 = Ticket.objects.create(
-            title="Wybita szyba",
-            description="Rozbite okno na parterze.",
-            location=point1,
-            building=building,
-            category=category,
+            title="Niedziałający kaloryfer na auli",
+            description="Kaloryfer w głównej auli na końcu sali jest całkowicie zimny, mimo że zawór jest odkręcony na maksimum. W sali jest bardzo zimno.",
+            location=building_b18.centroid,
+            building=building_b18,
+            category=category_heat,
             reporter=reporter2,
             priority=Ticket.Priority.CRITICAL,
             status=Ticket.Status.NEW
