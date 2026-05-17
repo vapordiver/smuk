@@ -16,7 +16,7 @@ function getPresetDates(days) {
     };
 }
 
-export default function HeatmapFilters({ filters, onChange, categories }) {
+export default function MapFilters({ filters, onChange, categories }) {
     const [open, setOpen] = useState(false);
     const popoverRef = useRef(null);
     const triggerRef = useRef(null);
@@ -64,7 +64,7 @@ export default function HeatmapFilters({ filters, onChange, categories }) {
             <button
                 ref={triggerRef}
                 aria-expanded={open}
-                aria-label="Filtry heatmapy"
+                aria-label="Filtry mapy"
                 onClick={() => setOpen(prev => !prev)}
                 className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-3 py-2.5 rounded-lg shadow-md border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all"
             >
@@ -85,7 +85,7 @@ export default function HeatmapFilters({ filters, onChange, categories }) {
                 >
                     {/* header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                        <h4 className="font-bold text-sm text-slate-900">Filtry heatmapy</h4>
+                        <h4 className="font-bold text-sm text-slate-900">Filtry mapy</h4>
                         <button
                             onClick={() => setOpen(false)}
                             className="text-slate-400 hover:text-slate-600 transition-colors"

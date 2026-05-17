@@ -7,7 +7,7 @@ import CampusPolygonsLayer from '../components/map/CampusPolygonsLayer';
 import MarkersClusterLayer from '../components/map/MarkersClusterLayer';
 import HeatmapLayer from '../components/map/HeatmapLayer';
 import MapViewToggle from '../components/map/MapViewToggle';
-import HeatmapFilters from '../components/map/HeatmapFilters';
+import MapFilters from '../components/map/MapFilters';
 import useTicketsGeoJSON from '../hooks/useTicketsGeoJSON';
 import useHeatmapData from '../hooks/useHeatmapData';
 import useCampuses from '../hooks/useCampuses';
@@ -27,8 +27,8 @@ export default function CampusMap() {
 
     // wszystkie dane pobierane na poczatku, zapisywane w hook state
     // zmiana widoku nigdy nie pobiera ponownie danych
-    // heatmap data pobierane tylko wtedy gdy zmienia sie filtry
-    const { features } = useTicketsGeoJSON();
+    // dane obu trybów (markery i heatmapa) pobierane ponownie przy zmianie filtrów
+    const { features } = useTicketsGeoJSON(filters);
     const { points: heatPoints } = useHeatmapData(filters);
     const { campuses } = useCampuses();
     const { categories } = useCategories();
@@ -69,13 +69,11 @@ export default function CampusMap() {
             </MapContainer>
             {/* toolbar mapy */}
             <div className="absolute top-4 right-4 z-[400] flex items-center gap-2">
-                {viewMode === 'heatmap' && (
-                    <HeatmapFilters
-                        filters={filters}
-                        onChange={setFilters}
-                        categories={categories}
-                    />
-                )}
+                <MapFilters
+                    filters={filters}
+                    onChange={setFilters}
+                    categories={categories}
+                />
                 <MapViewToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
         </div>

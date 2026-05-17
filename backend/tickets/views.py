@@ -139,6 +139,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         """
         returns ticket in geojson format to map
         optimalization: bbox (area on screen)
+        filters: ?status, ?bbox, ?date_from, ?date_to, ?category_id
         """
         queryset = self.get_queryset()
         status_parameter = request.query_params.get("status")
@@ -159,7 +160,19 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                     queryset = queryset.filter(location__intersects=bbox_poly)
             except ValueError:
                 pass
-        
+
+        # filtry daty i kategorii dla markerow (tak samo jak dla heatmap)
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        category_id = request.query_params.get('category_id')
+
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+
         # transform to geojson format
         features = []
         for ticket in queryset:
