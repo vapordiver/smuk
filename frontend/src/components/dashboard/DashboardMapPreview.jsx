@@ -22,7 +22,7 @@ export default function DashboardMapPreview() {
                 maxZoom={22}
                 maxNativeZoom={19}
             />
-            {points && points.length > 0 && <HeatmapLayer points={points} />}
+            {points && points.length > 0 && <HeatmapLayer points={points} redrawOnMove={true} />}
         </MapContainer>
     );
 }

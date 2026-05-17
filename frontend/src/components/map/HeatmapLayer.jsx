@@ -5,7 +5,7 @@ import 'leaflet.heat';
 
 const DEFAULT_OPTIONS = { radius: 25, blur: 15, maxZoom: 17 };
 
-export default function HeatmapLayer({ points, radius, blur, maxZoom }) {
+export default function HeatmapLayer({ points, radius, blur, maxZoom, redrawOnMove = false }) {
     const map = useMap();
     const layerRef = useRef(null);
 
@@ -24,14 +24,28 @@ export default function HeatmapLayer({ points, radius, blur, maxZoom }) {
             blur: blur ?? DEFAULT_OPTIONS.blur,
             maxZoom: maxZoom ?? DEFAULT_OPTIONS.maxZoom,
         }).addTo(map);
+        
+        const redraw = () => {
+            if (layerRef.current) {
+                layerRef.current._reset();
+            }
+        }
+
+        if (redrawOnMove) {
+            map.on('move', redraw);
+        }
 
         return () => {
+            if (redrawOnMove) {
+                map.off('move', redraw);
+            }
+
             if (layerRef.current) {
                 map.removeLayer(layerRef.current);
                 layerRef.current = null;
             }
         };
-    }, [map, points, radius, blur, maxZoom]);
+    }, [map, points, radius, blur, maxZoom, redrawOnMove]);
 
     return null;
 }
