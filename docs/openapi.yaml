@@ -2,7 +2,7 @@ openapi: "3.0.3"
 
 info:
   title: SMUK API — System Monitorowania Usterek Kampusu
-  version: "1.2.0"
+  version: "1.3.0"
   description: |
     REST API dla systemu zgłaszania i zarządzania usterkami na terenie kampusu uczelni.
 
@@ -28,6 +28,8 @@ tags:
     description: CRUD zgłoszeń usterek, geofencing, duplikaty
   - name: Buildings
     description: Słownik budynków kampusu
+  - name: Campuses
+    description: Słownik poligonów kampusów
   - name: Categories
     description: Słownik kategorii usterek
   - name: Notifications
@@ -92,7 +94,10 @@ components:
         email:
           type: string
           format: email
-          example: jan@student.pk.edu.pl
+          description: |
+            Wymagana domena `@edu.p.lodz.pl` (studenci) lub `@p.lodz.pl` (pracownicy).
+            Pozostałe domeny → 400 VALIDATION_ERROR.
+          example: jan@edu.p.lodz.pl
         password:
           type: string
           format: password
@@ -182,6 +187,45 @@ components:
           maxItems: 2
           example: [19.9123, 50.0654]
 
+# --- GeoJSON Polygon ---
+    GeoJSONPolygon:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [Polygon]
+        coordinates:
+          type: array
+          description: |
+            Tablica ringów (zwykle 1 — outer ring). Każdy ring to lista [lng, lat]
+            z pierwszą i ostatnią parą identyczną (zamknięty kształt).
+          items:
+            type: array
+            items:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: number
+          example:
+            - - [19.4520, 51.7500]
+              - [19.4530, 51.7500]
+              - [19.4530, 51.7510]
+              - [19.4520, 51.7510]
+              - [19.4520, 51.7500]
+
+    # --- Campus ---
+    Campus:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Kampus A
+        polygon:
+          $ref: "#/components/schemas/GeoJSONPolygon"
+
     # --- Ticket (lista) ---
     TicketListItem:
       type: object
@@ -191,6 +235,9 @@ components:
         title:
           type: string
           example: Pęknięta rura w łazience
+        description:
+          type: string
+          example: Cieknie woda z rury pod umywalką...
         status:
           $ref: "#/components/schemas/TicketStatus"
         priority:
@@ -199,6 +246,16 @@ components:
           $ref: "#/components/schemas/Category"
         building:
           $ref: "#/components/schemas/Building"
+        floor:
+          type: integer
+          nullable: true
+          example: 2
+        room:
+          type: string
+          nullable: true
+          example: "204"
+        location:
+          $ref: "#/components/schemas/GeoJSONPoint"
         reporter:
           $ref: "#/components/schemas/UserShort"
         image:
@@ -1080,111 +1137,6 @@ paths:
   #       "403":
   #         description: Użytkownik nie jest reporterem tego ticketa
 
-  /api/tickets/geojson/:
-    get:
-      tags: [Tickets]
-      summary: Dane GeoJSON do mapy (markery)
-      description: Aktywne tickety w formacie GeoJSON do react-leaflet.
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: bbox
-          in: query
-          schema:
-            type: string
-            example: "19.90,50.06,19.92,50.07"
-          description: "Bounding box: min_lng,min_lat,max_lng,max_lat"
-        - name: status
-          in: query
-          schema:
-            $ref: "#/components/schemas/TicketStatus"
-          description: Domyślnie wyklucza CLOSED i ARCHIVED
-      responses:
-        "200":
-          description: GeoJSON FeatureCollection
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  type:
-                    type: string
-                    enum: [FeatureCollection]
-                  features:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        type:
-                          type: string
-                          enum: [Feature]
-                        geometry:
-                          $ref: "#/components/schemas/GeoJSONPoint"
-                        properties:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                            title:
-                              type: string
-                            category:
-                              type: string
-                            priority:
-                              $ref: "#/components/schemas/TicketPriority"
-                            status:
-                              $ref: "#/components/schemas/TicketStatus"
-                            created_at:
-                              type: string
-                              format: date-time
-
-  /api/tickets/heatmap-data/:
-    get:
-      tags: [Tickets]
-      summary: Dane do heatmapy
-      description: |
-        Zagregowane punkty do warstwy heatmap (leaflet.heat).
-        Widoczne zarówno dla koordynatora jak i zwykłego użytkownika (PWA).
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: date_from
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: date_to
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: category_id
-          in: query
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Lista punktów heatmap
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  points:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        lat:
-                          type: number
-                        lng:
-                          type: number
-                        intensity:
-                          type: integer
-              example:
-                points:
-                  - { lat: 50.0654, lng: 19.9123, intensity: 7 }
-                  - { lat: 50.0670, lng: 19.9100, intensity: 3 }
-
   # ═══════════════════════════════════════════════════════
   # BUILDINGS
   # ═══════════════════════════════════════════════════════
@@ -1210,6 +1162,40 @@ paths:
                 - id: 2
                   name: "Biblioteka Główna"
                   centroid: { type: Point, coordinates: [19.9135, 50.0648] }
+
+  # ═══════════════════════════════════════════════════════
+  # CAMPUSES
+  # ═══════════════════════════════════════════════════════
+
+  /api/campuses/:
+    get:
+      tags: [Campuses]
+      summary: Lista poligonów kampusów
+      description: |
+        Publiczny endpoint zwracający poligony kampusów w formacie GeoJSON Polygon.
+        Frontend wykorzystuje je do nakładania obrysów kampusu na mapę Leaflet.
+        Backend wykorzystuje te same poligony do geofencingu (walidacja lokalizacji
+        nowych zgłoszeń przez `ST_Contains`).
+      responses:
+        "200":
+          description: Lista kampusów
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campus"
+              example:
+                - id: 1
+                  name: "Kampus A"
+                  polygon:
+                    type: Polygon
+                    coordinates:
+                      - - [19.4520, 51.7500]
+                        - [19.4530, 51.7500]
+                        - [19.4530, 51.7510]
+                        - [19.4520, 51.7510]
+                        - [19.4520, 51.7500]
 
   # ═══════════════════════════════════════════════════════
   # CATEGORIES
