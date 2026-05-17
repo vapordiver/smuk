@@ -11,7 +11,7 @@ export default function useHeatmapData(filters = {}) {
         setLoading(true);
         setError(null);
 
-        // Build query string from filters
+        // query string na podstawie filtrow z heatmapy
         const params = new URLSearchParams();
         if (filters.date_from) params.append('date_from', filters.date_from);
         if (filters.date_to) params.append('date_to', filters.date_to);
@@ -38,8 +38,6 @@ export default function useHeatmapData(filters = {}) {
         return () => {
             isMounted = false;
         };
-    // Deps are individual primitives, not the `filters` object, to avoid
-    // re-fetching on every render when caller passes a new object literal.
     }, [filters.date_from, filters.date_to, filters.category_id]);
 
     return { points, loading, error };
