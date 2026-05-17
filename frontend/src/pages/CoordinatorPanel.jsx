@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 /**
@@ -6,22 +6,9 @@ import api from '../services/api';
  * Based on code.html mockup and the Indigo Scholar Design System (DESIGN.md).
  */
 
-/* ── Mock data (retained only for charts and reports) ── */
-const TREND_DATA = [
-  { label: 'Wrz', value: 42, heightPct: 40 },
-  { label: 'Paź', value: 68, heightPct: 65 },
-  { label: 'Lis', value: 94, heightPct: 85 },
-  { label: 'Gru', value: 48, heightPct: 45 },
-  { label: 'Sty', value: 56, heightPct: 55 },
-  { label: 'Lut', value: 76, heightPct: 70, active: true },
-];
-
-const CATEGORY_DIST = [
-  { label: 'Infrastruktura IT', pct: 45, color: 'bg-primary' },
-  { label: 'Hydraulika', pct: 25, color: 'bg-secondary' },
-  { label: 'Elektryka', pct: 20, color: 'bg-tertiary' },
-  { label: 'Inne', pct: 10, color: 'bg-outline-variant' },
-];
+/* ── Chart helpers ── */
+const CATEGORY_COLORS = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-outline-variant'];
+const MONTH_LABELS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
 const REPORTS_LIST = [
   {
@@ -31,6 +18,7 @@ const REPORTS_LIST = [
     title: 'Raport Miesięczny - Luty 2024',
     description: 'Wszystkie kategorie, Wszystkie statusy',
     generatedAt: 'Dzisiaj, 09:41',
+    generatedOn: '2024-02-15',
   },
   {
     id: 2,
@@ -39,6 +27,7 @@ const REPORTS_LIST = [
     title: 'Usterki IT - Semestr Zimowy',
     description: 'Infrastruktura IT, Tylko zakończone',
     generatedAt: 'Wczoraj, 14:20',
+    generatedOn: '2024-01-18',
   },
 ];
 
@@ -67,6 +56,88 @@ const formatDate = (isoString) => {
         hour: '2-digit',
         minute: '2-digit',
     });
+};
+
+const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const getMonthLabel = (date) => {
+  const month = MONTH_LABELS_PL[date.getMonth()] || '';
+  return month ? month.charAt(0).toUpperCase() + month.slice(1) : '';
+};
+
+const buildTrendData = (tickets, endDate = new Date()) => {
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const monthDate = new Date(endDate.getFullYear(), endDate.getMonth() - 5 + index, 1);
+    return {
+      key: getMonthKey(monthDate),
+      label: getMonthLabel(monthDate),
+    };
+  });
+
+  const counts = new Map(months.map((month) => [month.key, 0]));
+
+  tickets.forEach((ticket) => {
+    if (!ticket.created_at) return;
+    const ticketDate = new Date(ticket.created_at);
+    if (Number.isNaN(ticketDate.getTime())) return;
+
+    const monthKey = getMonthKey(ticketDate);
+    if (counts.has(monthKey)) {
+      counts.set(monthKey, counts.get(monthKey) + 1);
+    }
+  });
+
+  const maxValue = Math.max(...counts.values(), 1);
+
+  return months.map((month, index) => {
+    const value = counts.get(month.key) || 0;
+    return {
+      label: month.label,
+      value,
+      heightPct: value === 0 ? 8 : Math.max(12, Math.round((value / maxValue) * 85)),
+      active: index === months.length - 1,
+    };
+  });
+};
+
+const buildCategoryDist = (tickets) => {
+  const counts = new Map();
+
+  tickets.forEach((ticket) => {
+    const label = ticket.category?.name || 'Inne';
+    counts.set(label, (counts.get(label) || 0) + 1);
+  });
+
+  const sortedEntries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+
+  if (sortedEntries.length === 0) {
+    return [];
+  }
+
+  const topEntries = sortedEntries.slice(0, 3);
+  const remainingCount = sortedEntries.slice(3).reduce((sum, [, count]) => sum + count, 0);
+  if (remainingCount > 0) {
+    topEntries.push(['Inne', remainingCount]);
+  }
+
+  const total = tickets.length || 1;
+
+  return topEntries.map(([label, count], index) => ({
+    label,
+    pct: Math.round((count / total) * 100),
+    color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+  }));
+};
+
+const createBaseTicketParams = ({ statusFilter, priorityFilter, dateFrom, dateTo }) => {
+  const params = new URLSearchParams();
+
+  if (statusFilter) params.append('status', statusFilter);
+  if (priorityFilter) params.append('priority', priorityFilter);
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+
+  return params;
 };
 
 /* ── Sub-components ── */
@@ -439,10 +510,11 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
 export default function CoordinatorPanel() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [showDateFilter, setShowDateFilter] = useState(false);
   const [tickets, setTickets] = useState([]);
+  const [chartTickets, setChartTickets] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isChartLoading, setIsChartLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 10;
@@ -451,22 +523,14 @@ export default function CoordinatorPanel() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sortPriority, setSortPriority] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     setIsLoading(true);
     try {
         const offset = (currentPage - 1) * pageSize;
-        const params = new URLSearchParams({
-            limit: pageSize,
-            offset: offset,
-        });
-
-        if (statusFilter) params.append('status', statusFilter);
-        if (priorityFilter) params.append('priority', priorityFilter);
-        if (searchQuery) params.append('search', searchQuery);
-        if (dateFrom) params.append('date_from', dateFrom);
-        if (dateTo) params.append('date_to', dateTo);
+        const params = createBaseTicketParams({ statusFilter, priorityFilter, dateFrom, dateTo });
+        params.set('limit', String(pageSize));
+        params.set('offset', String(offset));
         if (sortPriority) {
            const prefix = sortPriority === 'desc' ? '-' : '';
            params.append('ordering', `${prefix}priority`);
@@ -482,11 +546,55 @@ export default function CoordinatorPanel() {
     } finally {
         setIsLoading(false);
     }
-  };
+      }, [currentPage, dateFrom, dateTo, priorityFilter, sortPriority, statusFilter]);
+
+  const fetchChartTickets = useCallback(async () => {
+    setIsChartLoading(true);
+    try {
+      const params = createBaseTicketParams({ statusFilter, priorityFilter, dateFrom, dateTo });
+      params.set('limit', '1000');
+      params.set('offset', '0');
+      params.set('ordering', '-created_at');
+
+      const res = await api.get(`tickets/?${params.toString()}`);
+      const results = res.data.results || [];
+      const count = res.data.count || results.length;
+
+      if (count > results.length) {
+        const pageSizeForCharts = 1000;
+        const totalPages = Math.ceil(count / pageSizeForCharts);
+        const allResults = [...results];
+
+        for (let pageIndex = 1; pageIndex < totalPages; pageIndex += 1) {
+          const pageParams = createBaseTicketParams({ statusFilter, priorityFilter, dateFrom, dateTo });
+          pageParams.set('limit', String(pageSizeForCharts));
+          pageParams.set('offset', String(pageIndex * pageSizeForCharts));
+          pageParams.set('ordering', '-created_at');
+
+          const pageRes = await api.get(`tickets/?${pageParams.toString()}`);
+          allResults.push(...(pageRes.data.results || []));
+        }
+
+        setChartTickets(allResults);
+        return;
+      }
+
+      setChartTickets(results);
+    } catch (err) {
+      console.error('Błąd podczas pobierania danych do wykresów:', err);
+      setChartTickets([]);
+    } finally {
+      setIsChartLoading(false);
+    }
+  }, [dateFrom, dateTo, priorityFilter, statusFilter]);
 
   useEffect(() => {
       fetchTickets();
-  }, [currentPage, statusFilter, priorityFilter, searchQuery, dateFrom, dateTo, sortPriority]);
+      }, [fetchTickets]);
+
+  useEffect(() => {
+      fetchChartTickets();
+  }, [fetchChartTickets]);
 
   useEffect(() => {
       const fetchCoordinators = async () => {
@@ -500,17 +608,20 @@ export default function CoordinatorPanel() {
       fetchCoordinators();
   }, []);
 
-  // Reset page when filters change
-  useEffect(() => {
-      setCurrentPage(1);
-  }, [statusFilter, priorityFilter, searchQuery, dateFrom, dateTo, sortPriority]);
-
-  const handleTicketUpdated = (updatedTicket) => {
+  const handleTicketUpdated = () => {
       // Refresh the entire list from server to ensure sorting/pagination/filtering is consistent
       fetchTickets();
+      fetchChartTickets();
   };
 
   const totalPages = Math.ceil(totalCount / pageSize);
+  const visibleReports = REPORTS_LIST.filter((report) => {
+    if (dateFrom && report.generatedOn < dateFrom) return false;
+    if (dateTo && report.generatedOn > dateTo) return false;
+    return true;
+  });
+  const trendData = buildTrendData(chartTickets, dateTo ? new Date(`${dateTo}T00:00:00`) : new Date());
+  const categoryData = buildCategoryDist(chartTickets);
 
   return (
     <main className="flex-1 overflow-y-auto p-6 lg:p-10 scrollbar-thin">
@@ -524,9 +635,61 @@ export default function CoordinatorPanel() {
             Kompleksowy przegląd i generowanie raportów usterek.
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-xl border border-outline-variant text-sm font-medium text-on-surface">
-          <span className="material-symbols-outlined text-primary text-[20px]">calendar_month</span>
-          Bieżący semestr
+        <div className="flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-4 text-sm text-on-surface shadow-sm">
+          <div className="flex items-center gap-2 font-semibold">
+            <span className="material-symbols-outlined text-primary text-[20px]">date_range</span>
+            Zakres dat
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+            <div className="flex flex-col gap-1.5 min-w-[150px]">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                Od
+              </label>
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => {
+                  const nextDateFrom = e.target.value;
+                  setDateFrom(nextDateFrom);
+                  if (dateTo && nextDateFrom && nextDateFrom > dateTo) {
+                    setDateTo(nextDateFrom);
+                  }
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-2 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 min-w-[150px]">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                Do
+              </label>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => {
+                  const nextDateTo = e.target.value;
+                  setDateTo(nextDateTo);
+                  if (dateFrom && nextDateTo && nextDateTo < dateFrom) {
+                    setDateFrom(nextDateTo);
+                  }
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-2 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
+              />
+            </div>
+            <button
+              onClick={() => {
+                setDateFrom('');
+                setDateTo('');
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors"
+            >
+              Wyczyść
+            </button>
+          </div>
         </div>
       </header>
 
@@ -539,11 +702,18 @@ export default function CoordinatorPanel() {
               <h2 className="text-[20px] font-semibold text-on-surface">
                 Trend Zgłoszeń (Ostatnie 6 miesięcy)
               </h2>
-              <button className="text-on-surface-variant hover:text-primary transition-colors">
-                <span className="material-symbols-outlined">more_horiz</span>
-              </button>
             </div>
-            <BarChart data={TREND_DATA} />
+            {isChartLoading ? (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
+                Ładowanie wykresu...
+              </div>
+            ) : trendData.length > 0 ? (
+              <BarChart data={trendData} />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
+                Brak danych do wyświetlenia.
+              </div>
+            )}
           </div>
 
           {/* Category distribution (1/3 width) */}
@@ -551,21 +721,31 @@ export default function CoordinatorPanel() {
             <h2 className="text-[20px] font-semibold text-on-surface mb-6">
               Dystrybucja Kategorii
             </h2>
-            <div className="flex-1 flex flex-col justify-center gap-4">
-              {CATEGORY_DIST.map((cat) => (
-                <CategoryRow key={cat.label} {...cat} />
-              ))}
-              {/* Progress bar */}
-              <div className="w-full h-3 rounded-full flex overflow-hidden mt-4">
-                {CATEGORY_DIST.map((cat) => (
-                  <div
-                    key={cat.label}
-                    className={`h-full ${cat.color}`}
-                    style={{ width: `${cat.pct}%` }}
-                  />
-                ))}
+            {isChartLoading ? (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
+                Ładowanie wykresu...
               </div>
-            </div>
+            ) : categoryData.length > 0 ? (
+              <div className="flex-1 flex flex-col justify-center gap-4">
+                {categoryData.map((cat) => (
+                  <CategoryRow key={cat.label} {...cat} />
+                ))}
+                {/* Progress bar */}
+                <div className="w-full h-3 rounded-full flex overflow-hidden mt-4">
+                  {categoryData.map((cat) => (
+                    <div
+                      key={cat.label}
+                      className={`h-full ${cat.color}`}
+                      style={{ width: `${cat.pct}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
+                Brak danych do wyświetlenia.
+              </div>
+            )}
           </div>
         </section>
 
@@ -579,80 +759,23 @@ export default function CoordinatorPanel() {
               </div>
               <h2 className="text-[24px] font-bold text-on-surface">Raporty</h2>
             </div>
-
-            {/* Optional date filter toggle */}
-            <button
-              onClick={() => setShowDateFilter((v) => !v)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-all ${
-                showDateFilter
-                  ? 'bg-primary/10 text-primary border-primary/30'
-                  : 'bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary/40 hover:text-primary'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[18px]">date_range</span>
-              Filtruj po dacie
-              <span className="material-symbols-outlined text-[16px]">
-                {showDateFilter ? 'expand_less' : 'expand_more'}
-              </span>
-            </button>
           </div>
-
-          {/* Collapsible date range filter */}
-          {showDateFilter && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 mb-6 p-4 bg-surface-container-low rounded-xl border border-outline-variant">
-              <div className="flex flex-col gap-1.5 flex-1">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                  Data od
-                </label>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5 flex-1">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                  Data do
-                </label>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
-                />
-              </div>
-              <button
-                onClick={() => { setDateFrom(''); setDateTo(''); }}
-                className="px-4 py-3 rounded-xl text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors"
-              >
-                Wyczyść
-              </button>
-            </div>
-          )}
 
           {/* Report items */}
           <div className="flex flex-col gap-3">
-            {REPORTS_LIST.map((report) => (
+            {visibleReports.map((report) => (
               <ReportRow
                 key={report.id}
                 report={report}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
               />
             ))}
+            {visibleReports.length === 0 && (
+              <div className="text-center py-12 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed">
+                Brak raportów w wybranym zakresie dat.
+              </div>
+            )}
           </div>
 
-          {/* Archive link */}
-          <div className="mt-6 flex justify-end">
-            <a
-              href="#"
-              className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[16px]">folder_open</span>
-              Zobacz archiwum
-            </a>
-          </div>
         </section>
 
         {/* ── Tickets list ── */}
@@ -669,7 +792,10 @@ export default function CoordinatorPanel() {
             <div className="flex flex-wrap items-center gap-2">
               <select 
                 value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)} 
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }} 
                 className="px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Status: Wszystkie</option>
@@ -680,7 +806,10 @@ export default function CoordinatorPanel() {
               </select>
               <select 
                 value={priorityFilter} 
-                onChange={(e) => setPriorityFilter(e.target.value)} 
+                onChange={(e) => {
+                  setPriorityFilter(e.target.value);
+                  setCurrentPage(1);
+                }} 
                 className="px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Priorytet: Wszystkie</option>
@@ -691,7 +820,10 @@ export default function CoordinatorPanel() {
               </select>
               <select 
                 value={sortPriority} 
-                onChange={(e) => setSortPriority(e.target.value)} 
+                onChange={(e) => {
+                  setSortPriority(e.target.value);
+                  setCurrentPage(1);
+                }} 
                 className="px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Sortuj: Domyślnie</option>
