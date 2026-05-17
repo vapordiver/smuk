@@ -64,8 +64,6 @@ const getImageUrl = (imagePath) => {
 
 //ticket card display
 const TicketCard = ({ticket, onClick}) => {
-    const statusType = mapStatusToBadge(ticket.status);
-
     return (
         <div
             className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row h-full cursor-pointer"
@@ -121,7 +119,6 @@ const TicketModal = ({ticket, onClose}) => {
     const position = ticket.location?.coordinates
         ? [ticket.location.coordinates[1], ticket.location.coordinates[0]]
         : [51.7535, 19.4520];
-    const hasAuditLog = ticket.audit_log && ticket.audit_log.length > 0;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
             <div className="absolute inset-0" onClick={onClose}/>
@@ -220,35 +217,6 @@ const TicketModal = ({ticket, onClose}) => {
                             </MapContainer>
                         </div>
                     </div>
-                    {hasAuditLog && (
-                        <div>
-                            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                                <span className="material-symbols-outlined">history</span>
-                                Historia zmian
-                            </h4>
-                            <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
-                                {ticket.audit_log.map((entry, idx) => (
-                                    <div key={entry.id || idx}
-                                         className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
-                                        <div className="text-slate-400 whitespace-nowrap">
-                                            {formatDate(entry.created_at)}
-                                        </div>
-                                        <div>
-                                            <span className="font-medium text-slate-700">
-                                                {entry.user?.first_name} {entry.user?.last_name}
-                                            </span>
-                                            <span className="text-slate-500"> zmienił(a) </span>
-                                            <span className="font-medium">"{entry.field_changed}"</span>
-                                            <div className="text-slate-500 mt-0.5">
-                                                z <span className="line-through">{entry.old_value}</span> na{' '}
-                                                <span className="font-medium text-emerald-600">{entry.new_value}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                     {/* Footer */}
                     <div className="pt-4 border-t border-slate-100 text-xs text-slate-500">
                         Utworzono: {formatDate(ticket.created_at)}
