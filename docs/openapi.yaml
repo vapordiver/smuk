@@ -882,6 +882,127 @@ paths:
                   verification_status:
                     type: string
                     enum: [PENDING]
+  
+  /api/tickets/geojson/:
+    get:
+      tags: [Tickets]
+      summary: Zgłoszenia w formacie GeoJSON (mapa)
+      description: |
+        Zwraca aktywne zgłoszenia jako GeoJSON FeatureCollection.
+        Używane przez komponent CampusMap do renderowania markerów.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+        - name: bbox
+          in: query
+          description: "Bounding box: min_lng,min_lat,max_lng,max_lat"
+          schema:
+            type: string
+            example: "19.44,51.74,19.46,51.76"
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Kolekcja GeoJSON z markerami
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [FeatureCollection]
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [Feature]
+                        geometry:
+                          $ref: "#/components/schemas/GeoJSONPoint"
+                        properties:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            title:
+                              type: string
+                            category:
+                              type: string
+                            priority:
+                              $ref: "#/components/schemas/TicketPriority"
+                            status:
+                              $ref: "#/components/schemas/TicketStatus"
+                            created_at:
+                              type: string
+                              format: date-time
+
+  /api/tickets/heatmap-data/:
+    get:
+      tags: [Tickets]
+      summary: Zagregowane dane do heatmapy
+      description: |
+        Zwraca punkty zagregowane przestrzennie (ST_SnapToGrid, siatka ~11m)
+        z wagą intensity (liczba zgłoszeń w komórce). Wyklucza CLOSED/ARCHIVED.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista zagregowanych punktów heatmapy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lat:
+                          type: number
+                          format: float
+                          example: 51.7501
+                        lng:
+                          type: number
+                          format: float
+                          example: 19.4522
+                        intensity:
+                          type: integer
+                          example: 7
 
   # /api/tickets/{id}/confirm-resolution/:
   #   post:
