@@ -40,6 +40,32 @@ const mapPriorityToPolish = (priority) => {
     return priorityMap[priority] || priority;
 };
 
+const mapStatusToPolish = (status) => {
+    const statusMap = {
+        'NEW': 'Nowe',
+        'IN_PROGRESS': 'W trakcie',
+        'NEEDS_REVIEW': 'Do weryfikacji',
+        'RESOLVED': 'Rozwiązane',
+        'CLOSED': 'Zamknięte',
+        'ARCHIVED': 'Zarchiwizowane',
+    };
+    return statusMap[status] || status;
+};
+
+const mapAuditValueToPolish = (fieldChanged, value) => {
+    if (!value) return value;
+
+    if (fieldChanged === 'status') {
+        return mapStatusToPolish(value);
+    }
+
+    if (fieldChanged === 'priority') {
+        return mapPriorityToPolish(value);
+    }
+
+    return value;
+};
+
 const formatDate = (isoString) => {
     if (!isoString) return '—';
     return new Date(isoString).toLocaleDateString('pl-PL', {
@@ -60,6 +86,41 @@ const getImageUrl = (imagePath) => {
         return `http://localhost:8000${imagePath}`;
     }
     return imagePath;
+};
+
+const getAuditFieldLabel = (fieldChanged, oldValue) => {
+    const labels = {
+        status: 'status',
+        priority: 'priorytet',
+        assigned_to: 'przypisanie',
+        note: 'notatka',
+    };
+
+    return labels[fieldChanged] || fieldChanged;
+};
+
+const getAuditChangeText = (entry) => {
+    if (entry.field_changed === 'assigned_to') {
+        if (!entry.old_value && entry.new_value) {
+            return `na ${entry.new_value}`;
+        }
+
+        if (entry.old_value && entry.new_value) {
+            return `z ${entry.old_value} na ${entry.new_value}`;
+        }
+
+        if (entry.old_value && !entry.new_value) {
+            return `z ${entry.old_value} na brak przypisania`;
+        }
+    }
+
+    if (entry.field_changed === 'status' || entry.field_changed === 'priority') {
+        const oldValue = mapAuditValueToPolish(entry.field_changed, entry.old_value) || 'brak';
+        const newValue = mapAuditValueToPolish(entry.field_changed, entry.new_value) || 'brak';
+        return `z ${oldValue} na ${newValue}`;
+    }
+
+    return `z ${entry.old_value || 'brak'} na ${entry.new_value || 'brak'}`;
 };
 
 //ticket card display
@@ -119,6 +180,7 @@ const TicketModal = ({ticket, onClose}) => {
     const position = ticket.location?.coordinates
         ? [ticket.location.coordinates[1], ticket.location.coordinates[0]]
         : [51.7535, 19.4520];
+    const hasAuditLog = ticket.audit_log && ticket.audit_log.length > 0;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
             <div className="absolute inset-0" onClick={onClose}/>
@@ -217,6 +279,37 @@ const TicketModal = ({ticket, onClose}) => {
                             </MapContainer>
                         </div>
                     </div>
+                    {hasAuditLog && (
+                        <div>
+                            <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                <span className="material-symbols-outlined">history</span>
+                                Historia zmian
+                            </h4>
+                            <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+                                {ticket.audit_log.map((entry, idx) => (
+                                    <div key={entry.id || idx}
+                                         className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
+                                        <div className="text-slate-400 whitespace-nowrap">
+                                            {formatDate(entry.created_at)}
+                                        </div>
+                                        <div>
+                                            <span className="font-medium text-slate-700">
+                                                {entry.user?.first_name} {entry.user?.last_name}
+                                            </span>
+                                            <span className="text-slate-500"> zmienił(a) </span>
+                                            <span className="font-medium">{getAuditFieldLabel(entry.field_changed, entry.old_value)}</span>
+                                            <div className="text-slate-500 mt-0.5">
+                                                {entry.field_changed === 'assigned_to'
+                                                    ? <span className="font-medium text-emerald-600">{getAuditChangeText(entry)}</span>
+                                                    : getAuditChangeText(entry)
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {/* Footer */}
                     <div className="pt-4 border-t border-slate-100 text-xs text-slate-500">
                         Utworzono: {formatDate(ticket.created_at)}

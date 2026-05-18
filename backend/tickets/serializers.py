@@ -3,6 +3,8 @@ from .models import Building, FaultCategory, Ticket, AuditLog, Campus
 from users.serializers import UserShortSerializer
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
+from django.contrib.auth import get_user_model
+import uuid
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -43,6 +45,32 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
             "id", "user", "field_changed",
             "old_value", "new_value", "created_at"
         ]
+
+    def _resolve_assigned_user(self, value):
+        if not value:
+            return value
+
+        try:
+            uuid.UUID(str(value))
+        except (TypeError, ValueError):
+            return value
+
+        User = get_user_model()
+        user = User.objects.filter(pk=value).only("first_name", "last_name", "email").first()
+        if not user:
+            return value
+
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        return full_name or user.email or str(user.id)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        if instance.field_changed == "assigned_to":
+            data["old_value"] = self._resolve_assigned_user(data.get("old_value"))
+            data["new_value"] = self._resolve_assigned_user(data.get("new_value"))
+
+        return data
 
 
 class TicketListSerializer(serializers.ModelSerializer):

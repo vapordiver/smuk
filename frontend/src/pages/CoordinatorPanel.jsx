@@ -290,6 +290,17 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
   const auditLog = ticket.audit_log || [];
 
   const getLogDisplay = (log) => {
+    const resolveUserName = (value) => {
+      if (!value) return '';
+
+      const matchedCoordinator = coordinators.find((candidate) => candidate.id === value);
+      if (matchedCoordinator) {
+        return `${matchedCoordinator.first_name} ${matchedCoordinator.last_name}`.trim();
+      }
+
+      return value;
+    };
+
     if (log.field_changed === 'note') {
        return {
           title: 'Dodano notatkę',
@@ -298,13 +309,8 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
     }
     
     if (log.field_changed === 'assigned_to') {
-       const getMockName = (id) => {
-         if (!id || id === 'None' || id === 'null') return '';
-         const c = coordinators.find(m => m.id === id);
-         return c ? `${c.first_name} ${c.last_name}` : 'Nieznany użytkownik';
-       };
-       const oldName = getMockName(log.old_value);
-       const newName = getMockName(log.new_value);
+       const oldName = resolveUserName(log.old_value);
+       const newName = resolveUserName(log.new_value);
        
        if (!oldName) {
            return {

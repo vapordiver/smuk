@@ -17,6 +17,21 @@ from .tasks import calculate_priority
 logger = logging.getLogger(__name__)
 
 
+def _format_user_display(user_id):
+    if not user_id:
+        return None
+
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    user = User.objects.filter(pk=user_id).only('first_name', 'last_name', 'email').first()
+    if not user:
+        return str(user_id)
+
+    full_name = f'{user.first_name} {user.last_name}'.strip()
+    return full_name or user.email or str(user.id)
+
+
 class BuildingsListView(generics.ListAPIView):
     """
     GET /api/buildings/
@@ -199,8 +214,8 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                     ticket=ticket,
                     user=request.user,
                     field_changed='assigned_to',
-                    old_value=str(old_assigned) if old_assigned else None,
-                    new_value=str(new_assigned) if new_assigned else None
+                    old_value=_format_user_display(old_assigned),
+                    new_value=_format_user_display(new_assigned)
                 )
 
         if 'note' in serializer.validated_data and serializer.validated_data['note']:
