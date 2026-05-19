@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import '../utils/leafletSetup';
 
 import CampusPolygonsLayer from '../components/map/CampusPolygonsLayer';
@@ -16,6 +17,7 @@ import useCategories from '../hooks/useCategories';
 // campus center (calculated from campuses A, B, C polygons)
 const CAMPUS_CENTER = [51.7500, 19.4520];
 const DEFAULT_ZOOM = 15;
+const SVG_RENDERER = L.svg({ padding: 1.0 });
 
 export default function CampusMap() {
     const [viewMode, setViewMode] = useState('markers'); // 'markers' | 'heatmap'
@@ -56,11 +58,10 @@ export default function CampusMap() {
                     maxNativeZoom={19}
                 />
 
+                <CampusPolygonsLayer campuses={campuses} />
+
                 {viewMode === 'markers' && (
-                    <>
-                        <CampusPolygonsLayer campuses={campuses} />
-                        <MarkersClusterLayer features={features} />
-                    </>
+                    <MarkersClusterLayer features={features} />
                 )}
 
                 {viewMode === 'heatmap' && heatPoints.length > 0 && (
