@@ -183,7 +183,7 @@ export default function MapFilters({ filters, onChange, categories }) {
                         {activeFilterCount > 0 && (
                             <button
                                 onClick={clearAll}
-                                className="w-full px-3 py-2 text-xs font-semibold text-slate-500 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-lg transition-all flex items-center justify-center gap-1.5"
+                                className="w-full px-3 py-2 text-xs font-semibold text-red-500 bg-red-50 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all flex items-center justify-center gap-1.5"
                             >
                                 <span className="material-symbols-outlined text-sm">delete_sweep</span>
                                 Wyczyść filtry
