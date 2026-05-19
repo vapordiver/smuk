@@ -64,7 +64,7 @@ export default function CampusMap() {
                 )}
 
                 {viewMode === 'heatmap' && heatPoints.length > 0 && (
-                    <HeatmapLayer points={heatPoints} />
+                    <HeatmapLayer points={heatPoints} redrawOnMove={true}/>
                 )}
             </MapContainer>
             {/* toolbar mapy */}
