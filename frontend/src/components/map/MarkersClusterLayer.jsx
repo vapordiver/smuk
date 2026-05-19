@@ -3,22 +3,24 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import { formatDate, PRIORITY_LABELS, PRIORITY_COLORS } from '../../utils/formatters';
 
-const createPriorityIcon = (priority) => {
-    const color = PRIORITY_COLORS[priority] || PRIORITY_COLORS.LOW;
-    return L.divIcon({
-        className: '',
-        html: `<div style="
-            width: 30px;
-            height: 30px;
-            background-color: ${color};
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        "></div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-    });
-};
+const PRIORITY_ICONS = Object.fromEntries(
+    Object.entries(PRIORITY_COLORS).map(([priority, color]) => [
+        priority,
+        L.divIcon({
+            className: '',
+            html: `<div style="
+                width: 30px;
+                height: 30px;
+                background-color: ${color};
+                border: 3px solid white;
+                border-radius: 50%;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            "></div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+        }),
+    ])
+);
 
 const createClusterIcon = (cluster) => {
     const count = cluster.getChildCount();
@@ -57,7 +59,7 @@ export default function MarkersClusterLayer({ features }) {
             spiderfyOnMaxZoom={true}
             spiderfyDistanceMultiplier={1.5}
             maxClusterRadius={60}
-            removeOutsideVisibleBounds={false}
+            removeOutsideVisibleBounds={true}
             showCoverageOnHover={false}
         >
             {features.map(feature => {
@@ -70,7 +72,7 @@ export default function MarkersClusterLayer({ features }) {
                     <Marker
                         key={props.id}
                         position={position}
-                        icon={createPriorityIcon(props.priority)}
+                        icon={PRIORITY_ICONS[props.priority] || PRIORITY_ICONS.LOW}
                     >
                         <Popup>
                             <div className="font-['Lexend_Variable'] min-w-[200px]">
