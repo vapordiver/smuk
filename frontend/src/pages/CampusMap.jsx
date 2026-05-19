@@ -27,9 +27,9 @@ export default function CampusMap() {
         category_id: null,
     });
 
-    // wszystkie dane pobierane na poczatku, zapisywane w hook state
-    // zmiana widoku nigdy nie pobiera ponownie danych
-    // dane obu trybów (markery i heatmapa) pobierane ponownie przy zmianie filtrów
+    // all data fetched on mount, cached in hook state
+    // view toggle never re-fetches
+    // both modes re-fetch when filters change
     const { features } = useTicketsGeoJSON(filters);
     const { points: heatPoints } = useHeatmapData(filters);
     const { campuses } = useCampuses();
@@ -68,7 +68,7 @@ export default function CampusMap() {
                     <HeatmapLayer points={heatPoints} redrawOnMove={true} />
                 )}
             </MapContainer>
-            {/* toolbar mapy */}
+            {/* map toolbar */}
             <div className="absolute top-4 right-4 z-10 flex flex-col sm:flex-row items-end sm:items-center gap-2">
                 <MapViewToggle viewMode={viewMode} onChange={setViewMode} />
                 <MapFilters

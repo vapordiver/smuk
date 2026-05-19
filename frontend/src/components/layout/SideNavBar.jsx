@@ -10,7 +10,6 @@ import ImpactButton from '../common/ImpactButton';
  * @param {{ isOpen: boolean, onClose: () => void }} props
  */
 
-// MOCK — zmień na AuthContext w SMUK-7
 const userRole = 'REPORTER'; // 'COORDINATOR' | 'REPORTER'
 
 const NAV_ITEMS = [

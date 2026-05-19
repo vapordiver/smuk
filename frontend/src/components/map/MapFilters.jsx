@@ -21,7 +21,7 @@ export default function MapFilters({ filters, onChange, categories }) {
     const popoverRef = useRef(null);
     const triggerRef = useRef(null);
 
-    // zamknij po kliknieciu w obok
+    // close on outside click
     useEffect(() => {
         if (!open) return;
         function handleClickOutside(e) {
@@ -96,13 +96,13 @@ export default function MapFilters({ filters, onChange, categories }) {
                     </div>
 
                     <div className="p-4 space-y-4">
-                        {/* zakres dat */}
+                        {/* data range */}
                         <div>
                             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                                 Zakres dat
                             </label>
 
-                            {/* przyciski */}
+                            {/* preset buttons */}
                             <div className="flex gap-1.5 mb-3">
                                 {DATE_PRESETS.map(preset => {
                                     const presetDates = getPresetDates(preset.days);
@@ -124,7 +124,7 @@ export default function MapFilters({ filters, onChange, categories }) {
                                 })}
                             </div>
 
-                            {/* wlasny zakres dat */}
+                            {/* custom date range */}
                             <div className="space-y-2">
                                 <div>
                                     <label className="block text-xs text-slate-500 mb-1">Od</label>
@@ -146,7 +146,7 @@ export default function MapFilters({ filters, onChange, categories }) {
                                 </div>
                             </div>
 
-                            {/* walidacja daty */}
+                            {/* date validation */}
                             {dateError && (
                                 <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-sm">error</span>
@@ -155,7 +155,7 @@ export default function MapFilters({ filters, onChange, categories }) {
                             )}
                         </div>
 
-                        {/* kategoria */}
+                        {/* category  */}
                         <div>
                             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                                 Kategoria
@@ -179,7 +179,7 @@ export default function MapFilters({ filters, onChange, categories }) {
                             </div>
                         </div>
 
-                        {/* wyczysc */}
+                        {/* clear all */}
                         {activeFilterCount > 0 && (
                             <button
                                 onClick={clearAll}

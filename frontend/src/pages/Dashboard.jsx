@@ -52,7 +52,7 @@ export default function Dashboard() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Stat: W trakcie */}
+        {/* Stat: in progress  */}
         <div className="lg:col-span-3">
           <StatCard
             icon="pending_actions"
@@ -65,7 +65,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Stat: Rozwiązane */}
+        {/* Stat: resolved  */}
         <div className="lg:col-span-3">
           <StatCard
             icon="check_circle"

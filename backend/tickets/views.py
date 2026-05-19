@@ -161,7 +161,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             except ValueError:
                 pass
 
-        # filtry daty i kategorii dla markerow (tak samo jak dla heatmap)
+        # date and category filters for markers (same as heatmap)
         date_from = request.query_params.get('date_from')
         date_to = request.query_params.get('date_to')
         category_id = request.query_params.get('category_id')
@@ -206,8 +206,8 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
     def heatmap_data(self, request):
         """
         GET /api/tickets/heatmap-data/
-        Zwraca zagregowane koordynaty zgłoszeń dla heatmapy
-        Filtry: ?date_from, ?date_to, ?category_id
+        Returns aggregated ticket coordinates for the heatmap layer
+        Filters: ?date_from, ?date_to, ?category_id
         """
         qs = (Ticket.objects
               .filter(location__isnull=False)

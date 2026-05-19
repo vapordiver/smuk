@@ -10,7 +10,7 @@ export default function useTicketsGeoJSON(filters = {}) {
         let isMounted = true;
         setLoading(true);
         setError(null);
-        // query string filtrow
+        // build query string from filter params
         const params = new URLSearchParams();
         if (filters.date_from) params.append('date_from', filters.date_from);
         if (filters.date_to) params.append('date_to', filters.date_to);

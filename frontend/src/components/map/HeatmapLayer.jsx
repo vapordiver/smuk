@@ -10,7 +10,7 @@ export default function HeatmapLayer({ points, radius, blur, maxZoom, max, redra
     const layerRef = useRef(null);
 
     useEffect(() => {
-        // czyszczenie poprzedniej warstwy
+        // remove previous layer
         if (layerRef.current) {
             map.removeLayer(layerRef.current);
             layerRef.current = null;
