@@ -81,7 +81,7 @@ export default function MapFilters({ filters, onChange, categories }) {
             {open && (
                 <div
                     ref={popoverRef}
-                    className="absolute top-full mt-2 right-0 z-[400] w-72  bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-slate-200 max-h-[calc(100vh-8rem)] overflow-y-auto animate-in fade-in"
+                    className="absolute top-full mt-2 right-0 z-20 w-72 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-slate-200 max-h-[calc(100vh-8rem)] overflow-y-auto animate-in fade-in"
                 >
                     {/* header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">

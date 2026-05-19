@@ -64,11 +64,11 @@ export default function CampusMap() {
                 )}
 
                 {viewMode === 'heatmap' && heatPoints.length > 0 && (
-                    <HeatmapLayer points={heatPoints} redrawOnMove={true}/>
+                    <HeatmapLayer points={heatPoints} redrawOnMove={true} />
                 )}
             </MapContainer>
             {/* toolbar mapy */}
-            <div className="absolute top-4 right-4 z-[400] flex flex-col sm:flex-row items-end sm:items-center gap-2">
+            <div className="absolute top-4 right-4 z-10 flex flex-col sm:flex-row items-end sm:items-center gap-2">
                 <MapViewToggle viewMode={viewMode} onChange={setViewMode} />
                 <MapFilters
                     filters={filters}
