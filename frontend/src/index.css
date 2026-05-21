@@ -1,9 +1,17 @@
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  src: url('/fonts/MaterialSymbolsOutlined.woff2') format('woff2');
+  font-display: block;
+}
+
 @import "tailwindcss";
 
 /* ── Indigo Scholar Design System ── */
 @theme {
   /* ─ Typography ─ */
-  --font-lexend: "Lexend", sans-serif;
+  --font-lexend: "Lexend Variable", sans-serif;
 
   /* ─ Primary palette ─ */
   --color-primary: #1132d4;
@@ -81,7 +89,21 @@
   }
 
   .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
   }
 
   /* Smooth transitions globally */

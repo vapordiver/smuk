@@ -10,12 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/lexend": "^5.2.11",
     "@tailwindcss/postcss": "^4.2.2",
     "axios": "^1.13.6",
     "leaflet": "^1.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
+    "react-leaflet-cluster": "^3.1.1",
     "react-router-dom": "^7.13.2"
   },
   "devDependencies": {

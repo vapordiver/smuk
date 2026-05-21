@@ -26,6 +26,20 @@ class BuildingSerializer(serializers.ModelSerializer):
             }
         return None
 
+class CampusSerializer(serializers.ModelSerializer):
+    polygon = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Campus
+        fields = ["id", "name", "polygon"]
+
+    def get_polygon(self, obj):
+        """Serialize PolygonField to GeoJSON format"""
+        if obj.polygon:
+            coords = [list(point) for point in obj.polygon.coords[0]]
+            return {"type": "Polygon", "coordinates": [coords]}
+        return None
+
 
 class FaultCategorySerializer(serializers.ModelSerializer):
     class Meta:

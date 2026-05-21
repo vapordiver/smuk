@@ -8,10 +8,12 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
-from .models import Building, FaultCategory, Ticket
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer
+from .models import Building, FaultCategory, Ticket, Campus, AuditLog
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
+from django.contrib.gis.geos import Polygon
+from django.db import transaction
 from .tasks import calculate_priority
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ def _format_user_display(user_id):
     return full_name or user.email or str(user.id)
 
 
+
 class BuildingsListView(generics.ListAPIView):
     """
     GET /api/buildings/
@@ -40,6 +43,16 @@ class BuildingsListView(generics.ListAPIView):
 
     queryset = Building.objects.all()
     serializer_class = BuildingSerializer
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    pagination_class = None
+class CampusListView(generics.ListAPIView):
+    """
+    GET /api/campuses/
+    Public endpoint that returns campus polygons for map overlay.
+    """
+    queryset = Campus.objects.all()
+    serializer_class = CampusSerializer
     authentication_classes = []
     permission_classes = [AllowAny]
     pagination_class = None
@@ -138,6 +151,61 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], url_path='geojson', permission_classes=[IsAuthenticated])
+    def geojson(self, request):
+        """
+        returns ticket in geojson format to map
+        optimalization: bbox (area on screen)
+        """
+        queryset = self.get_queryset()
+        status_parameter = request.query_params.get("status")
+        bbox_parameter = request.query_params.get("bbox")
+
+        if status_parameter:
+            queryset = queryset.filter(status=status_parameter)
+        else:
+            queryset = queryset.exclude(status__in=['CLOSED', 'ARCHIVED'])
+
+        # polygon view on screen
+        # filtered by tickets in bbox area
+        if bbox_parameter:
+            try:
+                bbox_values = [float(v) for v in bbox_parameter.split(",")]
+                if len(bbox_values) == 4:
+                    bbox_poly = Polygon.from_bbox(bbox_values)
+                    queryset = queryset.filter(location__intersects=bbox_poly)
+            except ValueError:
+                pass
+        
+        # transform to geojson format
+        features = []
+        for ticket in queryset:
+            if not ticket.location:
+                continue
+            feature = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    # geodjango coord: [longitude, latitude]
+                    "coordinates": [ticket.location.x, ticket.location.y]
+                },
+                "properties": {
+                    "id": ticket.id,
+                    "title": ticket.title,
+                    "category": ticket.category.name if ticket.category else None,
+                    "priority": ticket.priority,
+                    "status": ticket.status,
+                    "created_at": ticket.created_at.isoformat()
+                }
+            }
+            features.append(feature)
+
+        geojson_dict = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+
+        return Response(geojson_dict)
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

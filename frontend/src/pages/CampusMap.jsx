@@ -1,40 +1,160 @@
-import { useState } from 'react';
+import {useState, useEffect} from 'react';
+import {MapContainer, TileLayer, Marker, Popup, Polygon} from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import api from '../services/api';
+import '../utils/leafletSetup';
+import {formatDate, PRIORITY_LABELS, PRIORITY_COLORS} from '../utils/formatters';
+
+
+// campus center (calculated from campuses A, B, C polygons)
+const CAMPUS_CENTER = [51.7500, 19.4520];
+const DEFAULT_ZOOM = 15;
+
+const createPriorityIcon = (priority) => {
+    const color = PRIORITY_COLORS[priority] || PRIORITY_COLORS.LOW;
+    return L.divIcon({
+        className: '',
+        html: `<div style="
+            width: 30px;
+            height: 30px;
+            background-color: ${color};
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        "></div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+    });
+};
+
+const createClusterIcon = (cluster) => {
+    const count = cluster.getChildCount();
+    let diameter = 36;
+    if (count >= 10) diameter = 44;
+    if (count >= 25) diameter = 52;
+
+    return L.divIcon({
+        html: `<div style="
+            width: ${diameter}px;
+            height: ${diameter}px;
+            background: rgba(17, 50, 212, 0.85);
+            border: 3px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: ${count >= 100 ? '13' : '15'}px;
+            font-family: 'Lexend Variable', sans-serif;
+            box-shadow: 0 3px 10px rgba(17, 50, 212, 0.4);
+        ">${count}</div>`,
+        className: '',
+        iconSize: L.point(diameter, diameter),
+    });
+};
+
+function MapDataLoader({onFeaturesLoaded}) {
+    useEffect(() => {
+        api.get('tickets/geojson/')
+            .then(res => {
+                onFeaturesLoaded(res.data.features || []);
+            })
+            .catch(err => {
+                console.error('[CampusMap] GET /api/tickets/geojson/ failed:', err.message);
+            });
+    }, [onFeaturesLoaded]);
+
+    return null;
+}
+
 
 export default function CampusMap() {
-  const [query, setQuery] = useState('');
+    const [features, setFeatures] = useState([]);
+    const [campuses, setCampuses] = useState([]);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Search bar */}
-      <div className="p-4">
-        <div className="relative max-w-md">
-          <input
-            className="w-full bg-surface-container-low rounded-full px-4 py-2.5 text-sm pr-10 focus:ring-2 focus:ring-primary placeholder:text-on-surface-variant"
-            placeholder="Szukaj na mapie kampusu..."
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { /* TODO: handle search */ } }}
-          />
-          <button
-            type="button"
-            className="absolute right-3 inset-y-0 flex items-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-            aria-label="Szukaj"
-            onClick={() => { /* TODO: handle search */ }}
-          >
-            <span className="material-symbols-outlined text-xl">search</span>
-          </button>
-        </div>
-      </div>
+    useEffect(() => {
+        api.get('campuses/').then(res => setCampuses(res.data || [])).catch(() => {});
+    }, []);
 
-      {/* Map placeholder */}
-      <div className="flex-1 flex items-center justify-center bg-surface-container-low m-4 rounded-xl">
-        <div className="text-center">
-          <span className="material-symbols-outlined text-6xl text-on-surface-variant/40">map</span>
-          <p className="mt-2 text-lg font-bold text-primary">Mapa Kampusu</p>
-          <p className="text-sm text-on-surface-variant">Wkrótce dostępna</p>
+    return (
+        <div className="flex flex-col h-full">
+            <MapContainer
+                center={CAMPUS_CENTER}
+                zoom={DEFAULT_ZOOM}
+                maxZoom={22}
+                className="flex-1 w-full z-0"
+                scrollWheelZoom={true}
+                tap={false}
+            >
+                <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    maxZoom={22}
+                    maxNativeZoom={19}
+                />
+                <MapDataLoader onFeaturesLoaded={setFeatures}/>
+                {campuses.map(campus => campus.polygon && (
+                    <Polygon
+                        key={`campus-${campus.id}`}
+                        positions={campus.polygon.coordinates[0].map(c => [c[1], c[0]])}
+                        pathOptions={{
+                            color: '#4f46e5',
+                            weight: 2,
+                            fillColor: '#4f46e5',
+                            fillOpacity: 0.08,
+                            dashArray: '6 4',
+                        }}
+                    />
+                ))}
+                <MarkerClusterGroup
+                iconCreateFunction={createClusterIcon}
+                zoomToBoundsOnClick={true}
+                spiderfyOnMaxZoom={true}
+                spiderfyDistanceMultiplier={1.5}
+                maxClusterRadius={60}
+                removeOutsideVisibleBounds={false}
+                showCoverageOnHover={false}
+                >
+                    {features.map(feature => {
+                        const {coordinates} = feature.geometry;
+                        const props = feature.properties;
+                        // GeoJSON: [lng, lat] -> Leaflet: [lat, lng]
+                        const position = [coordinates[1], coordinates[0]];
+
+                        return (
+                            <Marker
+                                key={props.id}
+                                position={position}
+                                icon={createPriorityIcon(props.priority)}
+                            >
+                                <Popup>
+                                    <div className="font-['Lexend_Variable'] min-w-[200px]">
+                                        <h3 className="font-bold text-slate-900 text-sm mb-2">{props.title}</h3>
+                                        <div className="space-y-1 text-xs text-slate-600">
+                                            <p>
+                                                <span className="font-semibold">Kategoria:</span>{' '}
+                                                {props.category || '—'}
+                                            </p>
+                                            <p>
+                                                <span className="font-semibold">Priorytet:</span>{' '}
+                                                <span style={{color: PRIORITY_COLORS[props.priority]}}>
+                                                    {PRIORITY_LABELS[props.priority] || props.priority}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                <span className="font-semibold">Zgłoszono:</span>{' '}
+                                                {formatDate(props.created_at)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Popup>
+                            </Marker>
+                        );
+                    })}
+                </MarkerClusterGroup>
+            </MapContainer>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
