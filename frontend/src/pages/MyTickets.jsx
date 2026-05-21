@@ -67,7 +67,7 @@ const getImageUrl = (imagePath) => {
     return imagePath;
 };
 
-const getAuditFieldLabel = (fieldChanged, oldValue) => {
+const getAuditFieldLabel = (fieldChanged) => {
     const labels = {
         status: 'status',
         priority: 'priorytet',
@@ -185,10 +185,10 @@ const TicketModal = ({ ticket, onClose }) => {
                         {ticket.priority && (
                             <div
                                 className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL'
-                                        ? 'bg-red-100 text-red-700 border-red-200'
-                                        : ticket.priority === 'MEDIUM'
-                                            ? 'bg-orange-100 text-orange-700 border-orange-200'
-                                            : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                    ? 'bg-red-100 text-red-700 border-red-200'
+                                    : ticket.priority === 'MEDIUM'
+                                        ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                        : 'bg-emerald-100 text-emerald-700 border-emerald-200'
                                     }`}>
                                 Priorytet: {PRIORITY_LABELS[ticket.priority] || ticket.priority}
                             </div>
@@ -275,7 +275,7 @@ const TicketModal = ({ ticket, onClose }) => {
                                                 {entry.user?.first_name} {entry.user?.last_name}
                                             </span>
                                             <span className="text-slate-500"> zmienił(a) </span>
-                                            <span className="font-medium">{getAuditFieldLabel(entry.field_changed, entry.old_value)}</span>
+                                            <span className="font-medium">{getAuditFieldLabel(entry.field_changed)}</span>
                                             <div className="text-slate-500 mt-0.5">
                                                 {entry.field_changed === 'assigned_to'
                                                     ? <span className="font-medium text-emerald-600">{getAuditChangeText(entry)}</span>
