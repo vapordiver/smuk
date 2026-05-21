@@ -8,6 +8,16 @@ import api from '../services/api';
 
 /* ── Chart helpers ── */
 const CATEGORY_COLORS = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-outline-variant'];
+const CATEGORY_HEX_COLORS = [
+  'var(--color-primary)',
+  'var(--color-secondary)',
+  'var(--color-tertiary)',
+  'var(--color-outline-variant)',
+  '#a78bfa',
+  '#34d399',
+  '#f97316',
+  '#e879f9',
+];
 const MONTH_LABELS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
 const REPORTS_LIST = [
@@ -74,28 +84,52 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     };
   });
 
-  const counts = new Map(months.map((month) => [month.key, 0]));
+  // Collect per-month category counts
+  const monthCatCounts = new Map(months.map((m) => [m.key, new Map()]));
 
   tickets.forEach((ticket) => {
     if (!ticket.created_at) return;
     const ticketDate = new Date(ticket.created_at);
     if (Number.isNaN(ticketDate.getTime())) return;
-
     const monthKey = getMonthKey(ticketDate);
-    if (counts.has(monthKey)) {
-      counts.set(monthKey, counts.get(monthKey) + 1);
-    }
+    if (!monthCatCounts.has(monthKey)) return;
+    const catLabel = ticket.category?.name || 'Inne';
+    const catMap = monthCatCounts.get(monthKey);
+    catMap.set(catLabel, (catMap.get(catLabel) || 0) + 1);
   });
 
-  const maxValue = Math.max(...counts.values(), 1);
+  // Build a global ordered category list (by total count descending)
+  const globalCatTotals = new Map();
+  monthCatCounts.forEach((catMap) => {
+    catMap.forEach((count, cat) => {
+      globalCatTotals.set(cat, (globalCatTotals.get(cat) || 0) + count);
+    });
+  });
+  const orderedCats = [...globalCatTotals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat], idx) => ({ cat, color: CATEGORY_HEX_COLORS[idx % CATEGORY_HEX_COLORS.length] }));
+
+  const totals = months.map((m) => {
+    const catMap = monthCatCounts.get(m.key) || new Map();
+    return [...catMap.values()].reduce((s, v) => s + v, 0);
+  });
+  const maxValue = Math.max(...totals, 1);
 
   return months.map((month, index) => {
-    const value = counts.get(month.key) || 0;
+    const catMap = monthCatCounts.get(month.key) || new Map();
+    const total = totals[index];
+    // Segments sorted from largest to smallest (will render bottom-to-top)
+    const segments = orderedCats
+      .map(({ cat, color }) => ({ cat, count: catMap.get(cat) || 0, color }))
+      .filter((s) => s.count > 0)
+      .sort((a, b) => b.count - a.count);
     return {
       label: month.label,
-      value,
-      heightPct: value === 0 ? 8 : Math.max(12, Math.round((value / maxValue) * 85)),
+      value: total,
+      heightPct: total === 0 ? 8 : Math.max(12, Math.round((total / maxValue) * 85)),
       active: index === months.length - 1,
+      segments,
+      orderedCats,
     };
   });
 };
@@ -143,40 +177,78 @@ const createBaseTicketParams = ({ statusFilter, priorityFilter, dateFrom, dateTo
 /* ── Sub-components ── */
 
 function BarChart({ data }) {
+  // Collect legend from the last bar that has orderedCats (all bars share the same list)
+  const orderedCats = data.find((b) => b.orderedCats?.length > 0)?.orderedCats || [];
+
   return (
-    <div className="flex-1 flex items-end justify-between gap-2 md:gap-6 pt-4 pb-2 border-b border-outline-variant relative">
-      {/* Dashed guide lines */}
-      <div className="absolute left-0 top-0 h-full w-full flex flex-col justify-between pointer-events-none z-0">
-        <div className="border-b border-dashed border-outline-variant w-full h-0" />
-        <div className="border-b border-dashed border-outline-variant w-full h-0" />
-        <div className="border-b border-dashed border-outline-variant w-full h-0" />
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Chart area */}
+      <div className="flex-1 flex items-end justify-between gap-2 md:gap-6 pt-4 pb-2 border-b border-outline-variant relative">
+        {/* Dashed guide lines */}
+        <div className="absolute left-0 top-0 h-full w-full flex flex-col justify-between pointer-events-none z-0">
+          <div className="border-b border-dashed border-outline-variant w-full h-0" />
+          <div className="border-b border-dashed border-outline-variant w-full h-0" />
+          <div className="border-b border-dashed border-outline-variant w-full h-0" />
+        </div>
+
+        {data.map((bar) => (
+          <div key={bar.label} className="flex flex-col items-center justify-end w-full h-full z-10">
+            {/* Stacked bar */}
+            <div
+              className="w-full rounded-t-md overflow-hidden relative flex flex-col-reverse"
+              style={{ height: `${bar.heightPct}%` }}
+              title={bar.segments.map((s) => `${s.cat}: ${s.count}`).join('\n') || bar.label}
+            >
+              {bar.value === 0 ? (
+                <div className="w-full h-full bg-outline-variant/20 rounded-t-md" />
+              ) : (
+                bar.segments.map((seg) => (
+                  <div
+                    key={seg.cat}
+                    className="w-full shrink-0"
+                    style={{
+                      height: `${Math.round((seg.count / bar.value) * 100)}%`,
+                      minHeight: seg.count > 0 ? '4px' : '0',
+                      backgroundColor: seg.color,
+                      opacity: bar.active ? 1 : 0.55,
+                    }}
+                  />
+                ))
+              )}
+              {/* Total label */}
+              {bar.value > 0 && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                  <span className="block bg-black/80 text-white text-[11px] font-bold leading-none px-1.5 py-1 rounded-md shadow-sm">
+                    {bar.value}
+                  </span>
+                </div>
+              )}
+            </div>
+            <span
+              className={`text-xs font-medium mt-3 ${
+                bar.active ? 'text-primary font-bold' : 'text-on-surface-variant'
+              }`}
+            >
+              {bar.label}
+            </span>
+          </div>
+        ))}
       </div>
 
-      {data.map((bar) => (
-        <div key={bar.label} className="flex flex-col items-center justify-end w-full h-full z-10">
-          <div
-            className={`w-full rounded-t-md relative ${
-              bar.active ? 'bg-primary' : 'bg-primary/30'
-            }`}
-            style={{ height: `${bar.heightPct}%` }}
-          >
-            {bar.active && (
+      {/* Legend */}
+      {orderedCats.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-2">
+          {orderedCats.map(({ cat, color }) => (
+            <div key={cat} className="flex items-center gap-1.5">
               <div
-                className="absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-xs py-1 px-2 rounded font-medium shadow-sm"
-              >
-                {bar.value}
-              </div>
-            )}
-          </div>
-          <span
-            className={`text-xs font-medium mt-3 ${
-              bar.active ? 'text-primary font-bold' : 'text-on-surface-variant'
-            }`}
-          >
-            {bar.label}
-          </span>
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-[11px] text-on-surface-variant font-medium">{cat}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -250,7 +322,6 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
   const [isSaving, setIsSaving] = useState(false);
   const [closingNote, setClosingNote] = useState('');
 
-  // Sync state if ticket props update
   useEffect(() => {
       setStatus(ticket.status || 'NEW');
       setPriority(ticket.priority || 'MEDIUM');
@@ -267,7 +338,7 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
         const payload = {
             status,
             priority,
-            assigned_to_id: assignee || null
+            assigned_to_id: assignee || null,
         };
         const res = await api.patch(`tickets/${ticket.id}/`, payload);
         onTicketUpdated(res.data);
@@ -307,38 +378,40 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
           content: <span className="font-italic text-on-surface">"{log.new_value}"</span>
        };
     }
-    
+
     if (log.field_changed === 'assigned_to') {
        const oldName = resolveUserName(log.old_value);
        const newName = resolveUserName(log.new_value);
-       
+
        if (!oldName) {
            return {
              title: 'Przypisano zgłoszenie',
              content: <>do <span className="font-bold text-primary">{newName}</span></>
            };
-       } else if (!newName) {
+       }
+
+       if (!newName) {
            return {
              title: 'Usunięto przypisanie',
              content: <>było <span className="line-through">{oldName}</span></>
            };
-       } else {
-           return {
-             title: 'Zmieniono przypisanie',
-             content: <>z <span className="line-through">{oldName}</span> na <span className="font-bold text-primary">{newName}</span></>
-           };
        }
+
+       return {
+         title: 'Zmieniono przypisanie',
+         content: <>z <span className="line-through">{oldName}</span> na <span className="font-bold text-primary">{newName}</span></>
+       };
     }
-    
+
     const fieldNameMap = { status: 'status', priority: 'priorytet' };
     const name = fieldNameMap[log.field_changed] || log.field_changed;
-    
+
     const formatVal = (val, field) => {
        if (field === 'status') return STATUS_MAP[val]?.label || val;
        if (field === 'priority') return PRIORITY_MAP[val]?.label || val;
        return val;
     };
-    
+
     return {
        title: `Zmieniono ${name}`,
        content: <>z <span className="line-through">{formatVal(log.old_value, log.field_changed)}</span> na <span className="font-bold text-primary">{formatVal(log.new_value, log.field_changed)}</span></>
@@ -347,20 +420,20 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
 
   return (
     <div className="bg-surface rounded-xl flex flex-col outline outline-1 outline-outline hover:shadow-sm transition-shadow">
-      <div className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      <div className="p-3 sm:p-4 flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4 cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <div className="flex-1">
-          <h3 className="font-bold text-on-surface">{ticket.title}</h3>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-medium mt-1">
+          <h3 className="font-bold text-on-surface text-[15px] sm:text-base">{ticket.title}</h3>
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-medium mt-1">
             <span className="text-on-surface-variant">{formatDate(ticket.created_at)}</span>
             <span className="mx-1 text-outline-variant">•</span>
             <span className="text-on-surface-variant">{ticket.category?.name || 'Inne'}</span>
           </div>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto" onClick={(e) => e.stopPropagation()}>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto" onClick={(e) => e.stopPropagation()}>
            <div className="relative group cursor-pointer" title="Zmień status">
-             <select 
-                value={status} 
+             <select
+                value={status}
                 onChange={(e) => {
                   const newStatus = e.target.value;
                   setStatus(newStatus);
@@ -369,23 +442,23 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                   }
                 }}
                 disabled={isClosed}
-                className={`text-xs font-bold uppercase rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none hover:shadow-sm transition-shadow ${getStatusColor(status)} ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                className={`text-[11px] sm:text-xs font-bold uppercase rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none hover:shadow-sm transition-shadow ${getStatusColor(status)} ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
              >
                {Object.entries(STATUS_MAP)
                  .filter(([k]) => k !== 'CLOSED' || isClosed)
                  .map(([k, v]) => (
-                 <option key={k} value={k} className="bg-surface text-on-surface uppercase">{v.label}</option>
-               ))}
+                   <option key={k} value={k} className="bg-surface text-on-surface uppercase">{v.label}</option>
+                 ))}
              </select>
              {!isClosed && <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">arrow_drop_down</span>}
            </div>
 
            <div className="relative group cursor-pointer" title="Zmień priorytet">
-             <select 
-                value={priority} 
+             <select
+                value={priority}
                 onChange={(e) => setPriority(e.target.value)}
                 disabled={isClosed}
-                className={`text-xs font-bold rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none hover:shadow-sm transition-shadow ${getPriorityColor(priority)} ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                className={`text-[11px] sm:text-xs font-bold rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none hover:shadow-sm transition-shadow ${getPriorityColor(priority)} ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
              >
                {Object.entries(PRIORITY_MAP).map(([k, v]) => (
                  <option key={k} value={k} className="bg-surface text-on-surface">{v.label}</option>
@@ -399,10 +472,10 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                value={assignee}
                onChange={(e) => setAssignee(e.target.value)}
                disabled={isClosed}
-               className={`text-xs font-medium rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none bg-surface-container-low text-on-surface hover:shadow-sm transition-shadow max-w-[150px] truncate ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+               className={`text-[11px] sm:text-xs font-medium rounded-lg pl-2 pr-6 py-1 outline-none border border-outline-variant appearance-none bg-surface-container-low text-on-surface hover:shadow-sm transition-shadow max-w-[150px] truncate ${isClosed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
              >
                <option value="">Nieprzypisane</option>
-               {coordinators.map(c => (
+               {coordinators.map((c) => (
                    <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
                ))}
              </select>
@@ -410,8 +483,8 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
            </div>
 
            {hasChanges && !isClosed && (
-             <button 
-               className="px-3 py-1 bg-primary text-on-primary text-xs font-bold rounded-lg hover:scale-[0.98] transition-transform shadow-sm flex items-center gap-1 disabled:opacity-50"
+             <button
+               className="px-2.5 py-1 bg-primary text-on-primary text-[11px] sm:text-xs font-bold rounded-lg hover:scale-[0.98] transition-transform shadow-sm flex items-center gap-1 disabled:opacity-50"
                onClick={handleSave}
                title="Zapisz zmiany"
                disabled={isSaving}
@@ -428,51 +501,51 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
            </button>
         </div>
       </div>
-      
+
       {expanded && (
-        <div className="p-4 border-t border-outline-variant bg-surface-container-lowest rounded-b-xl flex flex-col gap-4">
+        <div className="p-3 sm:p-4 border-t border-outline-variant bg-surface-container-lowest rounded-b-xl flex flex-col gap-3 sm:gap-4">
           <div>
-             <h4 className="text-sm font-bold text-on-surface mb-3">Historia zgłoszenia (AuditLog)</h4>
-             <div className="flex flex-col gap-3 pl-2 border-l-2 border-outline-variant ml-2">
+             <h4 className="text-[13px] sm:text-sm font-bold text-on-surface mb-2 sm:mb-3">Historia zgłoszenia (AuditLog)</h4>
+             <div className="flex flex-col gap-2.5 sm:gap-3 pl-2 border-l-2 border-outline-variant ml-2">
                {auditLog.length > 0 ? auditLog.map((log) => {
                  const display = getLogDisplay(log);
                  return (
-                 <div key={log.id} className="relative pl-4">
-                   <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-primary/40 border-2 border-surface" />
-                   <div className="text-xs font-medium text-on-surface-variant mb-0.5">
+                   <div key={log.id} className="relative pl-3 sm:pl-4">
+                     <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-primary/40 border-2 border-surface" />
+                     <div className="text-[11px] sm:text-xs font-medium text-on-surface-variant mb-0.5">
                        {formatDate(log.created_at)} • {log.user?.first_name} {log.user?.last_name}
-                   </div>
-                   <div className="text-sm text-on-surface font-semibold">{display.title}</div>
-                   <div className="text-xs text-on-surface-variant mt-1 p-2 bg-surface-container rounded-lg border border-outline">
+                     </div>
+                     <div className="text-[13px] sm:text-sm text-on-surface font-semibold">{display.title}</div>
+                     <div className="text-[11px] sm:text-xs text-on-surface-variant mt-1 p-2 bg-surface-container rounded-lg border border-outline">
                        {display.content}
+                     </div>
                    </div>
-                 </div>
                  );
                }) : (
                  <div className="text-xs text-on-surface-variant italic">Brak historii zmian.</div>
                )}
              </div>
           </div>
-          
+
           {ticket.status === 'CLOSED' && (
-              <div className="mt-2 pt-4 border-t border-outline-variant text-sm text-on-surface-variant italic text-center">
+              <div className="mt-2 pt-3 sm:pt-4 border-t border-outline-variant text-[13px] sm:text-sm text-on-surface-variant italic text-center">
                   Zgłoszenie jest zamknięte i nie można go już edytować.
               </div>
           )}
 
           {status === 'RESOLVED' && !isClosed && (
-             <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-outline-variant" onClick={(e) => e.stopPropagation()}>
-               <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+             <div className="flex flex-col gap-2 mt-2 pt-3 sm:pt-4 border-t border-outline-variant" onClick={(e) => e.stopPropagation()}>
+               <label className="text-[11px] sm:text-xs font-bold text-on-surface-variant uppercase tracking-wider">
                  Notatka rozwiązująca (wymagana do zamknięcia)
                </label>
-               <textarea 
+               <textarea
                  value={closingNote}
                  onChange={(e) => setClosingNote(e.target.value)}
-                 className="w-full p-3 rounded-lg border border-outline focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm bg-surface resize-none"
-                 rows="2" 
-                 placeholder="Wpisz notatkę z rozwiązaniem problemu..." 
+                 className="w-full p-2.5 sm:p-3 rounded-lg border border-outline focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm bg-surface resize-none"
+                 rows="2"
+                 placeholder="Wpisz notatkę z rozwiązaniem problemu..."
                />
-               <button 
+               <button
                  onClick={async (e) => {
                    e.stopPropagation();
                    if (!closingNote.trim()) {
@@ -485,10 +558,10 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                        status: 'CLOSED',
                        priority,
                        assigned_to_id: assignee || null,
-                       note: closingNote
+                       note: closingNote,
                      };
                      const res = await api.patch(`tickets/${ticket.id}/`, payload);
-                     
+
                      onTicketUpdated(res.data);
                      setExpanded(false);
                      setClosingNote('');
@@ -500,7 +573,7 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                    }
                  }}
                  disabled={!closingNote.trim() || isSaving}
-                 className="self-end px-4 py-2 bg-primary text-on-primary rounded-xl text-sm font-bold hover:scale-[0.98] transition-transform disabled:opacity-50"
+                 className="self-end px-3.5 py-2 bg-primary text-on-primary rounded-xl text-[13px] sm:text-sm font-bold hover:scale-[0.98] transition-transform disabled:opacity-50"
                >
                  {isSaving ? 'Zamykanie...' : 'Zapisz notatkę i zamknij zgłoszenie'}
                </button>
@@ -630,24 +703,24 @@ export default function CoordinatorPanel() {
   const categoryData = buildCategoryDist(chartTickets);
 
   return (
-    <main className="flex-1 overflow-y-auto p-6 lg:p-10 scrollbar-thin">
+    <main className="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-10 scrollbar-thin">
       {/* ── Page header ── */}
-      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[30px] font-bold tracking-[-0.015em] text-on-surface leading-tight">
+      <header className="mb-4 md:mb-6">
+        <div className="mb-4 md:mb-5">
+          <h1 className="text-[24px] md:text-[30px] font-bold tracking-[-0.015em] text-on-surface leading-tight">
             Analiza Zgłoszeń
           </h1>
-          <p className="text-on-surface-variant text-base mt-2">
+          <p className="text-on-surface-variant text-sm md:text-base mt-1.5 md:mt-2">
             Kompleksowy przegląd i generowanie raportów usterek.
           </p>
         </div>
-        <div className="flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-4 text-sm text-on-surface shadow-sm">
+        <div className="w-full flex flex-col gap-2.5 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-4 md:px-6 md:py-5 text-sm text-on-surface shadow-sm">
           <div className="flex items-center gap-2 font-semibold">
             <span className="material-symbols-outlined text-primary text-[20px]">date_range</span>
             Zakres dat
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
-            <div className="flex flex-col gap-1.5 min-w-[150px]">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 sm:gap-4">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
               <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
                 Od
               </label>
@@ -663,10 +736,10 @@ export default function CoordinatorPanel() {
                   }
                   setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
+                className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
               />
             </div>
-            <div className="flex flex-col gap-1.5 min-w-[150px]">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
               <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
                 Do
               </label>
@@ -682,19 +755,21 @@ export default function CoordinatorPanel() {
                   }
                   setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
+                className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
               />
             </div>
-            <button
-              onClick={() => {
-                setDateFrom('');
-                setDateTo('');
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors"
-            >
-              Wyczyść
-            </button>
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                  setCurrentPage(1);
+                }}
+                className="px-4 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors whitespace-nowrap"
+              >
+                Wyczyść
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -703,9 +778,9 @@ export default function CoordinatorPanel() {
         {/* ── Visualization bento ── */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Trend chart (2/3 width) */}
-          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-6 flex flex-col h-80">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-[20px] font-semibold text-on-surface">
+          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[22rem] sm:min-h-[26rem]">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface leading-tight">
                 Trend Zgłoszeń (Ostatnie 6 miesięcy)
               </h2>
             </div>
@@ -723,8 +798,8 @@ export default function CoordinatorPanel() {
           </div>
 
           {/* Category distribution (1/3 width) */}
-          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-6 flex flex-col h-80">
-            <h2 className="text-[20px] font-semibold text-on-surface mb-6">
+          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col h-72 sm:h-80">
+            <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface mb-4 sm:mb-6 leading-tight">
               Dystrybucja Kategorii
             </h2>
             {isChartLoading ? (
@@ -733,7 +808,7 @@ export default function CoordinatorPanel() {
               </div>
             ) : categoryData.length > 0 ? (
               <div className="flex-1 flex flex-col justify-center gap-4">
-                {categoryData.map((cat) => (
+                {categoryData.slice().reverse().map((cat) => (
                   <CategoryRow key={cat.label} {...cat} />
                 ))}
                 {/* Progress bar */}
@@ -756,14 +831,14 @@ export default function CoordinatorPanel() {
         </section>
 
         {/* ── Reports list ── */}
-        <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-8">
+        <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 lg:p-8">
           {/* Section header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-outline-variant pb-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline-variant pb-4 sm:pb-5 mb-4 sm:mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
                 <span className="material-symbols-outlined">summarize</span>
               </div>
-              <h2 className="text-[24px] font-bold text-on-surface">Raporty</h2>
+              <h2 className="text-xl sm:text-[24px] font-bold text-on-surface leading-tight">Raporty</h2>
             </div>
           </div>
 
@@ -785,24 +860,24 @@ export default function CoordinatorPanel() {
         </section>
 
         {/* ── Tickets list ── */}
-        <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-8">
+        <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 lg:p-8">
           {/* Section header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-outline-variant pb-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline-variant pb-4 sm:pb-5 mb-4 sm:mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
                 <span className="material-symbols-outlined">list_alt</span>
               </div>
-              <h2 className="text-[24px] font-bold text-on-surface">Obecne Zgłoszenia</h2>
+              <h2 className="text-xl sm:text-[24px] font-bold text-on-surface leading-tight">Obecne Zgłoszenia</h2>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <select 
                 value={statusFilter} 
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }} 
-                className="px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
+                className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Status: Wszystkie</option>
                 <option value="NEW">Nowe</option>
@@ -816,7 +891,7 @@ export default function CoordinatorPanel() {
                   setPriorityFilter(e.target.value);
                   setCurrentPage(1);
                 }} 
-                className="px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
+                className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Priorytet: Wszystkie</option>
                 <option value="LOW">Niskie</option>
@@ -830,7 +905,7 @@ export default function CoordinatorPanel() {
                   setSortPriority(e.target.value);
                   setCurrentPage(1);
                 }} 
-                className="px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
+                className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Sortuj: Domyślnie</option>
                 <option value="desc">Priorytet: najwyższy najpierw</option>
