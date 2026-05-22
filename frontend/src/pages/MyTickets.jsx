@@ -1,12 +1,11 @@
-import {useState, useEffect, useMemo} from 'react';
-import {MapContainer, TileLayer, Marker} from 'react-leaflet';
-import {useAuth} from "../context/AuthContext";
+import { useState, useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import { useAuth } from "../context/AuthContext";
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import api from '../services/api';
 import StatusBadge from '../components/common/StatusBadge';
 import '../utils/leafletSetup';
-import {formatDate, PRIORITY_LABELS} from '../utils/formatters';
+import { formatDate, PRIORITY_LABELS } from '../utils/formatters';
 
 
 const mapStatusToBadge = (apiStatus) => {
@@ -21,6 +20,42 @@ const mapStatusToBadge = (apiStatus) => {
     return statusMap[apiStatus] || 'new';
 };
 
+const mapPriorityToPolish = (priority) => {
+    const priorityMap = {
+        'LOW': 'Niski',
+        'MEDIUM': 'Średni',
+        'HIGH': 'Wysoki',
+        'CRITICAL': 'Krytyczny',
+    };
+    return priorityMap[priority] || priority;
+};
+
+const mapStatusToPolish = (status) => {
+    const statusMap = {
+        'NEW': 'Nowe',
+        'IN_PROGRESS': 'W trakcie',
+        'NEEDS_REVIEW': 'Do weryfikacji',
+        'RESOLVED': 'Rozwiązane',
+        'CLOSED': 'Zamknięte',
+        'ARCHIVED': 'Zarchiwizowane',
+    };
+    return statusMap[status] || status;
+};
+
+const mapAuditValueToPolish = (fieldChanged, value) => {
+    if (!value) return value;
+
+    if (fieldChanged === 'status') {
+        return mapStatusToPolish(value);
+    }
+
+    if (fieldChanged === 'priority') {
+        return mapPriorityToPolish(value);
+    }
+
+    return value;
+};
+
 const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
     if (imagePath.includes('backend:8000')) {
@@ -32,10 +67,43 @@ const getImageUrl = (imagePath) => {
     return imagePath;
 };
 
-//ticket card display
-const TicketCard = ({ticket, onClick}) => {
-    const statusType = mapStatusToBadge(ticket.status);
+const getAuditFieldLabel = (fieldChanged) => {
+    const labels = {
+        status: 'status',
+        priority: 'priorytet',
+        assigned_to: 'przypisanie',
+        note: 'notatka',
+    };
 
+    return labels[fieldChanged] || fieldChanged;
+};
+
+const getAuditChangeText = (entry) => {
+    if (entry.field_changed === 'assigned_to') {
+        if (!entry.old_value && entry.new_value) {
+            return `na ${entry.new_value}`;
+        }
+
+        if (entry.old_value && entry.new_value) {
+            return `z ${entry.old_value} na ${entry.new_value}`;
+        }
+
+        if (entry.old_value && !entry.new_value) {
+            return `z ${entry.old_value} na brak przypisania`;
+        }
+    }
+
+    if (entry.field_changed === 'status' || entry.field_changed === 'priority') {
+        const oldValue = mapAuditValueToPolish(entry.field_changed, entry.old_value) || 'brak';
+        const newValue = mapAuditValueToPolish(entry.field_changed, entry.new_value) || 'brak';
+        return `z ${oldValue} na ${newValue}`;
+    }
+
+    return `z ${entry.old_value || 'brak'} na ${entry.new_value || 'brak'}`;
+};
+
+//ticket card display
+const TicketCard = ({ ticket, onClick }) => {
     return (
         <div
             className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row h-full cursor-pointer"
@@ -73,7 +141,7 @@ const TicketCard = ({ticket, onClick}) => {
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                     <div className="flex items-center gap-2">
-                        <StatusBadge status={mapStatusToBadge(ticket.status)}/>
+                        <StatusBadge status={mapStatusToBadge(ticket.status)} />
                     </div>
                     <button
                         className="text-primary font-bold text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
@@ -85,7 +153,7 @@ const TicketCard = ({ticket, onClick}) => {
     );
 };
 
-const TicketModal = ({ticket, onClose}) => {
+const TicketModal = ({ ticket, onClose }) => {
     if (!ticket) return null;
     // Leaflet expects [lat, lng] - coordinates from DB are [lng, lat]
     const position = ticket.location?.coordinates
@@ -94,7 +162,7 @@ const TicketModal = ({ticket, onClose}) => {
     const hasAuditLog = ticket.audit_log && ticket.audit_log.length > 0;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-            <div className="absolute inset-0" onClick={onClose}/>
+            <div className="absolute inset-0" onClick={onClose} />
             <div
                 className="relative bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
@@ -113,16 +181,15 @@ const TicketModal = ({ticket, onClose}) => {
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
                     {/* Status and Priority */}
                     <div className="flex flex-wrap gap-3">
-                        <StatusBadge status={mapStatusToBadge(ticket.status)}/>
+                        <StatusBadge status={mapStatusToBadge(ticket.status)} />
                         {ticket.priority && (
                             <div
-                                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
-                                    ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL'
-                                        ? 'bg-red-100 text-red-700 border-red-200'
-                                        : ticket.priority === 'MEDIUM'
-                                    ? 'bg-orange-100 text-orange-700 border-orange-200'
-                                            : 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                }`}>
+                                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL'
+                                    ? 'bg-red-100 text-red-700 border-red-200'
+                                    : ticket.priority === 'MEDIUM'
+                                        ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                        : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                    }`}>
                                 Priorytet: {PRIORITY_LABELS[ticket.priority] || ticket.priority}
                             </div>
                         )}
@@ -185,8 +252,8 @@ const TicketModal = ({ticket, onClose}) => {
                                 className="h-full w-full"
                                 scrollWheelZoom={false}
                             >
-                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
-                                <Marker position={position}/>
+                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                <Marker position={position} />
                             </MapContainer>
                         </div>
                     </div>
@@ -199,7 +266,7 @@ const TicketModal = ({ticket, onClose}) => {
                             <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
                                 {ticket.audit_log.map((entry, idx) => (
                                     <div key={entry.id || idx}
-                                         className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
+                                        className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
                                         <div className="text-slate-400 whitespace-nowrap">
                                             {formatDate(entry.created_at)}
                                         </div>
@@ -208,10 +275,12 @@ const TicketModal = ({ticket, onClose}) => {
                                                 {entry.user?.first_name} {entry.user?.last_name}
                                             </span>
                                             <span className="text-slate-500"> zmienił(a) </span>
-                                            <span className="font-medium">"{entry.field_changed}"</span>
+                                            <span className="font-medium">{getAuditFieldLabel(entry.field_changed)}</span>
                                             <div className="text-slate-500 mt-0.5">
-                                                z <span className="line-through">{entry.old_value}</span> na{' '}
-                                                <span className="font-medium text-emerald-600">{entry.new_value}</span>
+                                                {entry.field_changed === 'assigned_to'
+                                                    ? <span className="font-medium text-emerald-600">{getAuditChangeText(entry)}</span>
+                                                    : getAuditChangeText(entry)
+                                                }
                                             </div>
                                         </div>
                                     </div>
@@ -232,7 +301,7 @@ const TicketModal = ({ticket, onClose}) => {
 // main page
 
 export default function MyTickets() {
-    const {user} = useAuth();
+    const { user } = useAuth();
     const [tickets, setTickets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Wszystkie');
@@ -286,9 +355,8 @@ export default function MyTickets() {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-6 py-3 font-bold transition-all border-b-2 ${
-                                activeTab === tab ? 'text-primary border-primary' : 'text-slate-500 border-transparent hover:text-primary'
-                            }`}
+                            className={`px-6 py-3 font-bold transition-all border-b-2 ${activeTab === tab ? 'text-primary border-primary' : 'text-slate-500 border-transparent hover:text-primary'
+                                }`}
                         >
                             {tab}
                         </button>
@@ -300,7 +368,7 @@ export default function MyTickets() {
                     {isLoading ? (
                         <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 animate-pulse">
                             {[1, 2, 3, 4].map(i => <div key={i}
-                                                        className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
+                                className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
                         </div>
                     ) : filteredTickets.length === 0 ? (
                         <div className="w-full flex-1 flex flex-col items-center justify-center py-24 text-slate-400">
@@ -313,26 +381,26 @@ export default function MyTickets() {
                     ) : (
                         <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
                             {filteredTickets.map(ticket => (
-                                <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
+                                <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket} />
                             ))}
                         </div>
                     )}
                 </div>
 
                 <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary"/>
-                    <StatItem label="Oczekujące" value={stats.pending} color="text-error"/>
-                    <StatItem label="W trakcie" value={stats.progress} color="text-blue-600"/>
-                    <StatItem label="Rozwiązane" value={stats.resolved} color="text-secondary"/>
+                    <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary" />
+                    <StatItem label="Oczekujące" value={stats.pending} color="text-error" />
+                    <StatItem label="W trakcie" value={stats.progress} color="text-blue-600" />
+                    <StatItem label="Rozwiązane" value={stats.resolved} color="text-secondary" />
                 </div>
 
             </div>
-            <TicketModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)}/>
+            <TicketModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
         </div>
     );
 }
 
-function StatItem({label, value, color}) {
+function StatItem({ label, value, color }) {
     return (
         <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
             <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>

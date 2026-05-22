@@ -3,6 +3,8 @@ from .models import Building, FaultCategory, Ticket, AuditLog, Campus
 from users.serializers import UserShortSerializer
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
+from django.contrib.auth import get_user_model
+import uuid
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -58,6 +60,32 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
             "old_value", "new_value", "created_at"
         ]
 
+    def _resolve_assigned_user(self, value):
+        if not value:
+            return value
+
+        try:
+            uuid.UUID(str(value))
+        except (TypeError, ValueError):
+            return value
+
+        User = get_user_model()
+        user = User.objects.filter(pk=value).only("first_name", "last_name", "email").first()
+        if not user:
+            return value
+
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        return full_name or user.email or str(user.id)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        if instance.field_changed == "assigned_to":
+            data["old_value"] = self._resolve_assigned_user(data.get("old_value"))
+            data["new_value"] = self._resolve_assigned_user(data.get("new_value"))
+
+        return data
+
 
 class TicketListSerializer(serializers.ModelSerializer):
     """
@@ -66,12 +94,14 @@ class TicketListSerializer(serializers.ModelSerializer):
     category = FaultCategorySerializer(read_only=True)
     building = BuildingSerializer(read_only=True)
     reporter = UserShortSerializer(read_only=True)
+    assigned_to = UserShortSerializer(read_only=True)
+    audit_log = AuditLogEntrySerializer(source="audit_logs", many=True, read_only=True)
 
     class Meta:
         model = Ticket
         fields = [
             "id", "title", "description", "status", "priority", "category",
-            "building", "floor", "room", "reporter", "location", "image", "created_at"
+            "building", "floor", "room", "reporter", "assigned_to", "location", "image", "created_at", "audit_log"
         ]
 
 
@@ -206,9 +236,19 @@ class TicketCreateSerializer(serializers.Serializer):
 
 class TicketUpdateSerializer(serializers.ModelSerializer):
     """
-    Serializer used for PATCH /api/tickets/<id>/
-    Allows coordinators to manually override specific fields like priority or status.
+    Serializer used for updating ticket status, priority, and assigned_to (PATCH /api/tickets/<id>/).
     """
+    assigned_to_id = serializers.UUIDField(required=False, allow_null=True)
+    note = serializers.CharField(required=False, allow_null=True, write_only=True)
+
     class Meta:
         model = Ticket
-        fields = ["priority", "status", "assigned_to"]
+        fields = ["status", "priority", "assigned_to_id", "note"]
+
+    def validate_assigned_to_id(self, value):
+        from django.contrib.auth import get_user_model
+        if value is not None:
+            User = get_user_model()
+            if not User.objects.filter(pk=value).exists():
+                raise serializers.ValidationError("User with this ID does not exist.")
+        return value
