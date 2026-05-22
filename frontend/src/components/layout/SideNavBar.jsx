@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import ImpactButton from '../common/ImpactButton';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * SideNavBar – Click-toggle sidebar overlay
@@ -9,8 +10,6 @@ import ImpactButton from '../common/ImpactButton';
  *
  * @param {{ isOpen: boolean, onClose: () => void }} props
  */
-
-const userRole = 'REPORTER'; // 'COORDINATOR' | 'REPORTER'
 
 const NAV_ITEMS = [
   { to: '/', icon: 'dashboard', label: 'Dashboard' },
@@ -45,9 +44,12 @@ function NavLink({ to, icon, label, isActive, onClick }) {
 
 export default function SideNavBar({ isOpen, onClose }) {
   const location = useLocation();
+  const { user } = useAuth();
+  
+  const userRole = user?.role || 'reporter';
 
-  const roleLink = userRole === 'COORDINATOR'
-    ? { to: '/admin', icon: 'admin_panel_settings', label: 'Panel Koordynatora' }
+  const roleLink = userRole === 'coordinator'
+    ? { to: '/admin', icon: 'admin_panel_settings', label: 'Analiza zgłoszeń' }
     : null;
 
   return (
@@ -92,19 +94,19 @@ export default function SideNavBar({ isOpen, onClose }) {
           />
         ))}
 
+        {/* Role-based link */}
+        {roleLink && (
+          <NavLink
+            to={roleLink.to}
+            icon={roleLink.icon}
+            label={roleLink.label}
+            isActive={location.pathname === roleLink.to}
+            onClick={onClose}
+          />
+        )}
+
         {/* Bottom section */}
         <div className="mt-auto flex flex-col gap-2 pb-8 sm:pb-4">
-          {/* Role-based link */}
-          {roleLink && (
-            <NavLink
-              to={roleLink.to}
-              icon={roleLink.icon}
-              label={roleLink.label}
-              isActive={location.pathname === roleLink.to}
-              onClick={onClose}
-            />
-          )}
-
           {/* New report CTA */}
           <Link to="/report" onClick={onClose} title="Nowe zgłoszenie">
             <div className="sidebar-cta-full">

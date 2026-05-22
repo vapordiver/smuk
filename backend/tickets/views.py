@@ -1,9 +1,12 @@
-from rest_framework import generics, viewsets, mixins, status
+import logging
+
+from rest_framework import generics, viewsets, mixins, status, filters
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db import transaction
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
 from .models import Building, FaultCategory, Ticket, Campus, AuditLog
 from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer
@@ -14,6 +17,23 @@ from django.contrib.gis.db.models.functions import SnapToGrid
 from django.db import transaction
 from django.db.models import Count
 from .tasks import calculate_priority
+
+logger = logging.getLogger(__name__)
+
+
+def _format_user_display(user_id):
+    if not user_id:
+        return None
+
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    user = User.objects.filter(pk=user_id).only('first_name', 'last_name', 'email').first()
+    if not user:
+        return str(user_id)
+
+    full_name = f'{user.first_name} {user.last_name}'.strip()
+    return full_name or user.email or str(user.id)
 
 
 
@@ -53,18 +73,18 @@ class FaultCategoriesListView(generics.ListAPIView):
     pagination_class = None
 
 
-class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet, mixins.UpdateModelMixin):
+class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
     `ticket` ViewSet for:
     `GET /api/tickets/`      (list)
     `GET /api/tickets/<id>/` (retrieve)
     `GET /api/tickets/my/`   (get_my_tickets)
     `POST /api/tickets/`     (create)
-    `PATCH /api/tickets/<id>/` (partial_update)
     """
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, OrderingFilter, filters.SearchFilter]
     filterset_class = TicketFilter
     ordering_fields = ['created_at', 'priority', 'status']
+    search_fields = ['title', 'description', 'id']
 
     def handle_exception(self, exc):
         response = super().handle_exception(exc)
@@ -97,6 +117,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         if self.action == 'create':
             return TicketCreateSerializer
         if self.action in ['update', 'partial_update']:
+            from .serializers import TicketUpdateSerializer
             return TicketUpdateSerializer
 
         return TicketDetailSerializer
@@ -111,9 +132,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
     def get_permissions(self):
         # only coordinators
-        if self.action == 'list':
-            return [IsAuthenticated(), IsInCoordinatorGroup()]
-        elif self.action in ['update', 'partial_update']:
+        if self.action in ['list', 'update', 'partial_update']:
             return [IsAuthenticated(), IsInCoordinatorGroup()]
         # ticket detail -> object-level
         elif self.action == 'retrieve':
@@ -247,17 +266,17 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         # compress image (Pillow -> WEBP)
         try:
             compressed_image = compress_image_to_webp(serializer.validated_data["image"])
-        except ValueError as e:
+        except ValueError:
+            logger.exception("Image processing failed during ticket creation")
             return Response(
                 {
                     "error": {
                         "code": "IMAGE_PROCESSING_ERROR",
-                        "message": str(e),
+                        "message": "Unable to process the uploaded image.",
                     }
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
 
         with transaction.atomic():
             ticket = Ticket.objects.create(
@@ -273,32 +292,60 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             )
 
             transaction.on_commit(lambda: calculate_priority.delay(ticket.id))
-        
+
         output_serializer = TicketDetailSerializer(ticket)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
-    def perform_update(self, serializer):
-        instance = self.get_object()
-        
-        changes = {}
-        for field, new_value in serializer.validated_data.items():
-            old_value = getattr(instance, field)
-            if old_value != new_value:
-                changes[field] = (old_value, new_value)
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        ticket = self.get_object()
+        serializer = self.get_serializer(ticket, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
 
-        with transaction.atomic():
-            updated_ticket = serializer.save()
+        old_status = ticket.status
+        old_priority = ticket.priority
+        old_assigned = ticket.assigned_to_id
 
-            logs_to_create = [
-                AuditLog(
-                    ticket=updated_ticket,
-                    user=self.request.user,
-                    field_changed=field,
-                    old_value=str(old_val),
-                    new_value=str(new_val)
+        self.perform_update(serializer)
+
+        from .models import AuditLog
+
+        if 'status' in serializer.validated_data and serializer.validated_data['status'] != old_status:
+            AuditLog.objects.create(
+                ticket=ticket,
+                user=request.user,
+                field_changed='status',
+                old_value=old_status,
+                new_value=serializer.validated_data['status']
+            )
+
+        if 'priority' in serializer.validated_data and serializer.validated_data['priority'] != old_priority:
+            AuditLog.objects.create(
+                ticket=ticket,
+                user=request.user,
+                field_changed='priority',
+                old_value=old_priority,
+                new_value=serializer.validated_data['priority']
+            )
+
+        if 'assigned_to_id' in serializer.validated_data:
+            new_assigned = serializer.validated_data['assigned_to_id']
+            if new_assigned != old_assigned:
+                AuditLog.objects.create(
+                    ticket=ticket,
+                    user=request.user,
+                    field_changed='assigned_to',
+                    old_value=_format_user_display(old_assigned),
+                    new_value=_format_user_display(new_assigned)
                 )
-                for field, (old_val, new_val) in changes.items()
-            ]
 
-            if logs_to_create:
-                AuditLog.objects.bulk_create(logs_to_create)
+        if 'note' in serializer.validated_data and serializer.validated_data['note']:
+            AuditLog.objects.create(
+                ticket=ticket,
+                user=request.user,
+                field_changed='note',
+                new_value=serializer.validated_data['note']
+            )
+
+        output_serializer = TicketDetailSerializer(ticket)
+        return Response(output_serializer.data)

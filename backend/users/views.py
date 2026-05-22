@@ -2,7 +2,7 @@ from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from .serializers import RegisterSerializer, UserSerializer
-
+from .permissions import IsInCoordinatorGroup
 
 User = get_user_model()
 
@@ -20,3 +20,11 @@ class UserView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+class CoordinatorsListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, IsInCoordinatorGroup]
+    pagination_class = None
+
+    def get_queryset(self):
+        return User.objects.filter(role=User.Role.COORDINATOR)
