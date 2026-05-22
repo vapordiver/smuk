@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { fetchCategories, fetchBuildings, submitTicket } from '../services/reportService';
+import useSubmitTicket from '../hooks/useSubmitTicket';
+import useCategories from '../hooks/useCategories';
+import useBuildings from '../hooks/useBuildings';
 import CameraCapture from '../components/report/CameraCapture';
 import LocationPicker from '../components/report/LocationPicker';
 import Toast, { useToast } from '../components/common/Toast';
@@ -12,11 +14,18 @@ import Toast, { useToast } from '../components/common/Toast';
 export default function ReportForm() {
   const navigate = useNavigate();
   const { toast, showToast } = useToast();
+  const { submitTicket, submitting } = useSubmitTicket();
 
   /* ── Dictionary data ── */
-  const [categories, setCategories] = useState([]);
-  const [buildings, setBuildings] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
+  const { buildings, loading: buildingsLoading, error: buildingsError } = useBuildings();
+  const loadingData = categoriesLoading || buildingsLoading;
+
+  useEffect(() => {
+    if (categoriesError || buildingsError) {
+      showToast('error', 'Nie udało się załadować danych formularza.');
+    }
+  }, [categoriesError, buildingsError, showToast]);
 
   /* ── Form fields ── */
   const [title, setTitle] = useState('');
@@ -28,7 +37,7 @@ export default function ReportForm() {
 
   /* ── Form state ── */
   const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
+
   
   const [isMobile, setIsMobile] = useState(true);
 
@@ -49,28 +58,7 @@ export default function ReportForm() {
   }, []);
 
   /* ── Load dictionary data ── */
-  useEffect(() => {
-    let mounted = true;
-    async function loadData() {
-      try {
-        const [cats, bldgs] = await Promise.all([
-          fetchCategories(),
-          fetchBuildings(),
-        ]);
-        if (mounted) {
-          setCategories(cats);
-          setBuildings(bldgs);
-        }
-      } catch (err) {
-        console.error('[ReportForm] Failed to load dictionaries:', err);
-        if (mounted) showToast('error', 'Nie udało się załadować danych formularza.');
-      } finally {
-        if (mounted) setLoadingData(false);
-      }
-    }
-    loadData();
-    return () => { mounted = false; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Loading is handled internally by useCategories and useBuildings hooks
 
   /* ── Validation ── */
   const validate = () => {
@@ -108,8 +96,6 @@ export default function ReportForm() {
       return;
     }
 
-    setSubmitting(true);
-
     try {
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -126,12 +112,7 @@ export default function ReportForm() {
 
       setTimeout(() => navigate('/my-tickets'), 2000);
     } catch (err) {
-      const message =
-        err?.response?.data?.error?.message ||
-        'Wystąpił błąd podczas wysyłania zgłoszenia. Spróbuj ponownie.';
-      showToast('error', message);
-    } finally {
-      setSubmitting(false);
+      showToast('error', err.message);
     }
   };
 
