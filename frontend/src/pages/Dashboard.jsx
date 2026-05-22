@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import StatCard from '../components/dashboard/StatCard';
 import RecentActivityCard from '../components/dashboard/RecentActivityCard';
+import DashboardMapPreview from '../components/dashboard/DashboardMapPreview';
 
 /**
  * Dashboard – Main landing page matching screen.png / code.html
@@ -40,8 +41,7 @@ const RECENT_ACTIVITIES = [
 
 export default function Dashboard() {
   return (
-    <main className="flex-1 overflow-y-auto p-6 lg:p-10 scrollbar-thin">
-      {/* ── Greeting ── */}
+    <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 lg:p-10 scrollbar-thin">
       <header className="mb-10">
         <h1 className="text-[36px] font-bold tracking-tight text-on-background mb-2">
           Witaj, Użytkowniku!
@@ -51,9 +51,8 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {/* ── Bento Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Stat: W trakcie */}
+        {/* Stat: in progress  */}
         <div className="lg:col-span-3">
           <StatCard
             icon="pending_actions"
@@ -66,7 +65,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Stat: Rozwiązane */}
+        {/* Stat: resolved  */}
         <div className="lg:col-span-3">
           <StatCard
             icon="check_circle"
@@ -95,44 +94,30 @@ export default function Dashboard() {
                   konserwacji zajmie się nim natychmiast.
                 </p>
               </div>
-              {/* Abstract bg shape */}
               <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-110 transition-transform" />
             </div>
           </Link>
         </div>
 
-        {/* Recent Activity (8 cols) */}
+        {/* Recent Activity */}
         <div className="lg:col-span-8">
           <RecentActivityCard items={RECENT_ACTIVITIES} />
         </div>
 
-        {/* Campus Map Preview (4 cols) */}
-        <div className="lg:col-span-4">
-          <div className="bg-surface border border-outline rounded-xl overflow-hidden shadow-soft flex flex-col h-full">
-            <div className="p-6">
+        {/* Campus Map Preview*/}
+        <div className="lg:col-span-4 relative h-full min-h-[400px]">
+          <div className="absolute inset-0 z-10 rounded-xl overflow-hidden shadow-soft bg-surface border border-outline transition-all duration-300 ease-out origin-center hover:z-30 hover:scale-105 hover:shadow-2xl hover:shadow-primary/30 flex flex-col">
+            <div className="p-6 bg-surface">
               <h3 className="text-lg font-bold mb-1">Mapa kampusu</h3>
               <p className="text-xs text-on-surface-variant">
-                Aktywne lokalizacje usterek
+                Zagęszczenie aktywnych zgłoszeń
               </p>
             </div>
-            <div className="flex-1 min-h-[300px] relative bg-surface-container-low">
-              {/* Map placeholder */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <span
-                    className="material-symbols-outlined text-primary text-5xl animate-pulse"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                  >
-                    location_on
-                  </span>
-                  <p className="text-xs text-on-surface-variant mt-2">
-                    Biblioteka Główna
-                  </p>
-                </div>
-              </div>
+            <div className="flex-1 relative bg-surface-container-low overflow-hidden">
+              <DashboardMapPreview />
               <Link
                 to="/map"
-                className="absolute bottom-4 right-4 bg-white px-3 py-2 rounded-lg shadow-md border border-outline hover:bg-surface-container-low transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold text-primary"
+                className="absolute bottom-4 right-4 bg-white px-3 py-2 rounded-lg shadow-md border border-outline hover:bg-surface-container-low transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold text-primary z-30"
               >
                 <span className="material-symbols-outlined text-base">
                   open_in_new

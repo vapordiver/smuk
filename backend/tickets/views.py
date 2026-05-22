@@ -13,7 +13,9 @@ from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDeta
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
 from django.contrib.gis.geos import Polygon
+from django.contrib.gis.db.models.functions import SnapToGrid
 from django.db import transaction
+from django.db.models import Count
 from .tasks import calculate_priority
 
 logger = logging.getLogger(__name__)
@@ -156,6 +158,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         """
         returns ticket in geojson format to map
         optimalization: bbox (area on screen)
+        filters: ?status, ?bbox, ?date_from, ?date_to, ?category_id
         """
         queryset = self.get_queryset()
         status_parameter = request.query_params.get("status")
@@ -176,7 +179,19 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                     queryset = queryset.filter(location__intersects=bbox_poly)
             except ValueError:
                 pass
-        
+
+        # date and category filters for markers (same as heatmap)
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        category_id = request.query_params.get('category_id')
+
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+
         # transform to geojson format
         features = []
         for ticket in queryset:
@@ -206,6 +221,44 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         }
 
         return Response(geojson_dict)
+    @action(detail=False, methods=['get'], url_path='heatmap-data', permission_classes=[IsAuthenticated])
+    def heatmap_data(self, request):
+        """
+        GET /api/tickets/heatmap-data/
+        Returns aggregated ticket coordinates for the heatmap layer
+        Filters: ?date_from, ?date_to, ?category_id
+        """
+        qs = (Ticket.objects
+              .filter(location__isnull=False)
+              .exclude(status__in=['CLOSED', 'ARCHIVED']))
+
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        category_id = request.query_params.get('category_id')
+
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+        if category_id:
+            qs = qs.filter(category_id=category_id)
+
+        # ~0.0001 degree ≈ 11m grid at latitude 51° (Łódź)
+        GRID_SIZE = 0.0001
+        aggregated = (qs
+                      .annotate(grid=SnapToGrid('location', GRID_SIZE))
+                      .values('grid')
+                      .annotate(intensity=Count('id'))
+                      .order_by())
+
+        points = [
+            {'lat': row['grid'].y, 'lng': row['grid'].x, 'intensity': row['intensity']}
+            for row in aggregated
+            if row['grid'] is not None
+        ]
+
+        return Response({'points': points})
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

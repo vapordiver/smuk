@@ -1,86 +1,49 @@
-import {useState, useEffect} from 'react';
-import {MapContainer, TileLayer, Marker, Popup, Polygon} from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
+import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import api from '../services/api';
 import '../utils/leafletSetup';
-import {formatDate, PRIORITY_LABELS, PRIORITY_COLORS} from '../utils/formatters';
 
+import CampusPolygonsLayer from '../components/map/CampusPolygonsLayer';
+import MarkersClusterLayer from '../components/map/MarkersClusterLayer';
+import HeatmapLayer from '../components/map/HeatmapLayer';
+import MapViewToggle from '../components/map/MapViewToggle';
+import MapFilters from '../components/map/MapFilters';
+import useTicketsGeoJSON from '../hooks/useTicketsGeoJSON';
+import useHeatmapData from '../hooks/useHeatmapData';
+import useCampuses from '../hooks/useCampuses';
+import useCategories from '../hooks/useCategories';
 
 // campus center (calculated from campuses A, B, C polygons)
 const CAMPUS_CENTER = [51.7500, 19.4520];
 const DEFAULT_ZOOM = 15;
-
-const createPriorityIcon = (priority) => {
-    const color = PRIORITY_COLORS[priority] || PRIORITY_COLORS.LOW;
-    return L.divIcon({
-        className: '',
-        html: `<div style="
-            width: 30px;
-            height: 30px;
-            background-color: ${color};
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        "></div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-    });
-};
-
-const createClusterIcon = (cluster) => {
-    const count = cluster.getChildCount();
-    let diameter = 36;
-    if (count >= 10) diameter = 44;
-    if (count >= 25) diameter = 52;
-
-    return L.divIcon({
-        html: `<div style="
-            width: ${diameter}px;
-            height: ${diameter}px;
-            background: rgba(17, 50, 212, 0.85);
-            border: 3px solid white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: ${count >= 100 ? '13' : '15'}px;
-            font-family: 'Lexend Variable', sans-serif;
-            box-shadow: 0 3px 10px rgba(17, 50, 212, 0.4);
-        ">${count}</div>`,
-        className: '',
-        iconSize: L.point(diameter, diameter),
-    });
-};
-
-function MapDataLoader({onFeaturesLoaded}) {
-    useEffect(() => {
-        api.get('tickets/geojson/')
-            .then(res => {
-                onFeaturesLoaded(res.data.features || []);
-            })
-            .catch(err => {
-                console.error('[CampusMap] GET /api/tickets/geojson/ failed:', err.message);
-            });
-    }, [onFeaturesLoaded]);
-
-    return null;
-}
-
+const SVG_RENDERER = L.svg({ padding: 1.0 });
 
 export default function CampusMap() {
-    const [features, setFeatures] = useState([]);
-    const [campuses, setCampuses] = useState([]);
+    const [viewMode, setViewMode] = useState('markers'); // 'markers' | 'heatmap'
+    const [filters, setFilters] = useState({
+        date_from: null,
+        date_to: null,
+        category_id: null,
+    });
+
+    // all data fetched on mount, cached in hook state
+    // view toggle never re-fetches
+    // both modes re-fetch when filters change
+    const { features } = useTicketsGeoJSON(filters);
+    const { points: heatPoints } = useHeatmapData(filters);
+    const { campuses } = useCampuses();
+    const { categories } = useCategories();
 
     useEffect(() => {
-        api.get('campuses/').then(res => setCampuses(res.data || [])).catch(() => {});
-    }, []);
+        if (filters.category_id && categories.length > 0
+            && !categories.some(c => c.id === filters.category_id)) {
+            setFilters(prev => ({ ...prev, category_id: null }));
+        }
+    }, [categories, filters.category_id]);
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full relative">
             <MapContainer
                 center={CAMPUS_CENTER}
                 zoom={DEFAULT_ZOOM}
@@ -94,67 +57,26 @@ export default function CampusMap() {
                     maxZoom={22}
                     maxNativeZoom={19}
                 />
-                <MapDataLoader onFeaturesLoaded={setFeatures}/>
-                {campuses.map(campus => campus.polygon && (
-                    <Polygon
-                        key={`campus-${campus.id}`}
-                        positions={campus.polygon.coordinates[0].map(c => [c[1], c[0]])}
-                        pathOptions={{
-                            color: '#4f46e5',
-                            weight: 2,
-                            fillColor: '#4f46e5',
-                            fillOpacity: 0.08,
-                            dashArray: '6 4',
-                        }}
-                    />
-                ))}
-                <MarkerClusterGroup
-                iconCreateFunction={createClusterIcon}
-                zoomToBoundsOnClick={true}
-                spiderfyOnMaxZoom={true}
-                spiderfyDistanceMultiplier={1.5}
-                maxClusterRadius={60}
-                removeOutsideVisibleBounds={false}
-                showCoverageOnHover={false}
-                >
-                    {features.map(feature => {
-                        const {coordinates} = feature.geometry;
-                        const props = feature.properties;
-                        // GeoJSON: [lng, lat] -> Leaflet: [lat, lng]
-                        const position = [coordinates[1], coordinates[0]];
 
-                        return (
-                            <Marker
-                                key={props.id}
-                                position={position}
-                                icon={createPriorityIcon(props.priority)}
-                            >
-                                <Popup>
-                                    <div className="font-['Lexend_Variable'] min-w-[200px]">
-                                        <h3 className="font-bold text-slate-900 text-sm mb-2">{props.title}</h3>
-                                        <div className="space-y-1 text-xs text-slate-600">
-                                            <p>
-                                                <span className="font-semibold">Kategoria:</span>{' '}
-                                                {props.category || '—'}
-                                            </p>
-                                            <p>
-                                                <span className="font-semibold">Priorytet:</span>{' '}
-                                                <span style={{color: PRIORITY_COLORS[props.priority]}}>
-                                                    {PRIORITY_LABELS[props.priority] || props.priority}
-                                                </span>
-                                            </p>
-                                            <p>
-                                                <span className="font-semibold">Zgłoszono:</span>{' '}
-                                                {formatDate(props.created_at)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </Popup>
-                            </Marker>
-                        );
-                    })}
-                </MarkerClusterGroup>
+                <CampusPolygonsLayer campuses={campuses} />
+
+                {viewMode === 'markers' && (
+                    <MarkersClusterLayer features={features} />
+                )}
+
+                {viewMode === 'heatmap' && heatPoints.length > 0 && (
+                    <HeatmapLayer points={heatPoints} redrawOnMove={true} />
+                )}
             </MapContainer>
+            {/* map toolbar */}
+            <div className="absolute top-4 right-4 z-10 flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                <MapViewToggle viewMode={viewMode} onChange={setViewMode} />
+                <MapFilters
+                    filters={filters}
+                    onChange={setFilters}
+                    categories={categories}
+                />
+            </div>
         </div>
     );
 }
