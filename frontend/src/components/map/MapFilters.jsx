@@ -112,11 +112,10 @@ export default function MapFilters({ filters, onChange, categories }) {
                                         <button
                                             key={preset.label}
                                             onClick={() => handlePreset(preset.days)}
-                                            className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                                                isActive
-                                                    ? 'bg-primary text-white shadow-sm'
-                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                            }`}
+                                            className={`flex-1 px-2 py-1.5 text-xs font-semibold rounded-md transition-all ${isActive
+                                                ? 'bg-primary text-white shadow-sm'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                }`}
                                         >
                                             {preset.label}
                                         </button>
@@ -183,7 +182,7 @@ export default function MapFilters({ filters, onChange, categories }) {
                         {activeFilterCount > 0 && (
                             <button
                                 onClick={clearAll}
-                                className="w-full px-3 py-2 text-xs font-semibold text-red-500 bg-red-50 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all flex items-center justify-center gap-1.5"
+                                className="w-full px-3 py-2 text-xs font-semibold text-[#FFFFFF] bg-[#8C1800] hover:text-[#FFEDE9] hover:bg-[#630E00] rounded-lg transition-all flex items-center justify-center gap-1.5"
                             >
                                 <span className="material-symbols-outlined text-sm">delete_sweep</span>
                                 Wyczyść filtry
