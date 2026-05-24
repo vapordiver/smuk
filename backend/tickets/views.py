@@ -102,7 +102,16 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 message = str(response.data["detail"])
                 details = None
             else:
-                message = "Validation failed."
+                # Extract the first meaningful field-level error message
+                first_message = None
+                for field, messages in response.data.items():
+                    if isinstance(messages, list) and messages:
+                        first_message = str(messages[0])
+                        break
+                    elif isinstance(messages, str):
+                        first_message = messages
+                        break
+                message = first_message or "Validation failed."
                 details = response.data
 
             body = {"code": error_code, "message": message}

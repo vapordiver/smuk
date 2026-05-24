@@ -16,7 +16,21 @@ export default function useSubmitTicket() {
       if (error.response) {
         const { status, data } = error.response;
         if (status === 400) {
-          errorMessage = data?.error?.message || 'Błędne dane lub jesteś poza dozwolonym obszarem kampusu (Geofencing).';
+          const serverMessage = data?.error?.message;
+          const details = data?.error?.details;
+
+          if (serverMessage && serverMessage !== 'Validation failed.') {
+            errorMessage = serverMessage;
+          } else if (details) {
+            // Extract the first field-level error
+            const firstField = Object.keys(details)[0];
+            const fieldErrors = details[firstField];
+            if (Array.isArray(fieldErrors) && fieldErrors.length > 0) {
+              errorMessage = fieldErrors[0];
+            }
+          } else {
+            errorMessage = serverMessage || 'Błędne dane formularza. Popraw zaznaczone pola.';
+          }
         } else if (status === 429) {
           errorMessage = 'Przekroczono limit zgłoszeń. Spróbuj ponownie za chwilę.';
         } else if (status >= 500) {
