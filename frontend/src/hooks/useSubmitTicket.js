@@ -12,6 +12,11 @@ export default function useSubmitTicket() {
       });
       return response.data;
     } catch (error) {
+      const translations = {
+        'Location is outside campus boundaries.': 'Lokalizacja znajduje się poza granicami kampusu.',
+        'Location is too far from selected building (max 300m).': 'Lokalizacja jest zbyt daleko od wybranego budynku (maks. 300m).'
+      };
+
       let errorMessage = 'Wystąpił błąd podczas wysyłania zgłoszenia. Spróbuj ponownie.';
       if (error.response) {
         const { status, data } = error.response;
@@ -39,6 +44,7 @@ export default function useSubmitTicket() {
       } else if (error.request) {
         errorMessage = 'Brak odpowiedzi z serwera. Sprawdź połączenie z internetem.';
       }
+      errorMessage = translations[errorMessage] || errorMessage;
       throw new Error(errorMessage);
     } finally {
       setSubmitting(false);

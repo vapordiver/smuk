@@ -38,7 +38,7 @@ export default function ReportForm() {
   /* ── Form state ── */
   const [errors, setErrors] = useState({});
 
-  
+
   const [isMobile, setIsMobile] = useState(true);
 
   /* ── Mobile Check ── */
@@ -48,10 +48,10 @@ export default function ReportForm() {
       const isMobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
       const hasTouch = (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
       const isMobileWidth = window.innerWidth <= 1024;
-      
+
       setIsMobile(isMobileRegex || (hasTouch && isMobileWidth));
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -112,6 +112,13 @@ export default function ReportForm() {
 
       setTimeout(() => navigate('/my-tickets'), 2000);
     } catch (err) {
+      const locationErrors = [
+        'Lokalizacja znajduje się poza granicami kampusu.',
+        'Lokalizacja jest zbyt daleko od wybranego budynku (maks. 300m).',
+      ];
+      if (locationErrors.includes(err.message)) {
+        setLocation(null);
+      }
       showToast('error', err.message);
     }
   };
