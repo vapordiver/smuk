@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 import os
 from pathlib import Path
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -164,20 +165,17 @@ CSRF_TRUSTED_ORIGINS = [
 # Celery
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
-CELERY_BEAT_SCHEDULE = {}
-# Celery Beat schedule - TODO: add periodic tasks
-# wrzucic ponizszy import na gore
-# --
-# from celery.schedules import crontab
-# --
-# statyczne narazie, bez django-celery-beat (raczej malo bedzie tych cyklicznych taskow i dlatego tak)
-# example:
-# CELERY_BEAT_SCHEDULE = {
-#     "generate_weekly_report": {
-#         "task": "smuk.tasks.generate_weekly_report",
-#         "schedule": crontab(day_of_week='mon', hour=0, minute=0),
-#     },
-# }
+CELERY_BEAT_SCHEDULE = {
+    "compress_old_images_daily": {
+        "task": "tickets.tasks.compress_old_images",
+        "schedule": crontab(hour=3, minute=0),
+    },
+    "archive_old_tickets_daily": {
+        "task": "tickets.tasks.archive_old_tickets",
+        "schedule": crontab(hour=3, minute=0),
+    },
+}
+# Celery Beat schedule - TODO: add weekly report task
 
 # Media files & AWS S3
 
