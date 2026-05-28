@@ -188,4 +188,4 @@ class WeeklyReport(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"Raport tygodniowy: {self.week_start.date() - self.week_end.date()}"
+        return f"Raport tygodniowy: {self.week_start.date()} – {self.week_end.date()}"

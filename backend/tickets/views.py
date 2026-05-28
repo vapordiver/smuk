@@ -368,4 +368,4 @@ class WeeklyReportListView(generics.ListAPIView):
     """
     queryset = WeeklyReport.objects.all()
     serializer_class = WeeklyReportSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInCoordinatorGroup]

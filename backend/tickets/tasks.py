@@ -197,8 +197,8 @@ def generate_weekly_report():
     ).count()
 
     resolved_count = Ticket.objects.filter(
-        created_at__gte=week_start,
-        created_at__lte=week_end,
+        updated_at__gte=week_start,
+        updated_at__lte=week_end,
         status__in=[Ticket.Status.RESOLVED, Ticket.Status.CLOSED],
     ).count()
 
@@ -206,40 +206,44 @@ def generate_weekly_report():
         status__in=[Ticket.Status.RESOLVED, Ticket.Status.CLOSED, Ticket.Status.ARCHIVED],
     ).count()
 
-    top_categories = list(
+    top_category_row = (
         Ticket.objects.filter(
             created_at__gte=week_start,
             created_at__lte=week_end,
             category__isnull=False,
         )
-        .values("category__name")
+        .values("category__id", "category__name")
         .annotate(count=Count("id"))
-        .order_by("-count")[:3]
+        .order_by("-count")
+        .first()
     )
 
-    top_buildings = list(
+    top_building_row = (
         Ticket.objects.filter(
             created_at__gte=week_start,
             created_at__lte=week_end,
             building__isnull=False,
         )
-        .values("building__name")
+        .values("building__id", "building__name")
         .annotate(count=Count("id"))
-        .order_by("-count")[:3]
+        .order_by("-count")
+        .first()
     )
 
     raw_stats = {
-        "created_count": created_count,
-        "resolved_count": resolved_count,
-        "pending_count": pending_count,
-        "top_categories": [
-            {"name": c["category__name"], "count": c["count"]}
-            for c in top_categories
-        ],
-        "top_buildings": [
-            {"name": b["building__name"], "count": b["count"]}
-            for b in top_buildings
-        ],
+        "total_created": created_count,
+        "total_resolved": resolved_count,
+        "total_open": pending_count,
+        "top_category": {
+            "id": top_category_row["category__id"],
+            "name": top_category_row["category__name"],
+            "count": top_category_row["count"],
+        } if top_category_row else None,
+        "top_building": {
+            "id": top_building_row["building__id"],
+            "name": top_building_row["building__name"],
+            "count": top_building_row["count"],
+        } if top_building_row else None,
     }
 
     # --- 2. Call Hugging Face API ---
@@ -250,14 +254,17 @@ def generate_weekly_report():
         hf_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
         headers = {"Authorization": f"Bearer {api_key}"}
 
+        top_cat_name = top_category_row["category__name"] if top_category_row else "N/A"
+        top_bld_name = top_building_row["building__name"] if top_building_row else "N/A"
+
         prompt = (
             f"You are an assistant that writes concise weekly reports for a campus fault-reporting system. "
             f"Here are the stats for the past 7 days:\n"
             f"- New tickets created: {created_count}\n"
             f"- Resolved/closed tickets: {resolved_count}\n"
             f"- Currently pending tickets: {pending_count}\n"
-            f"- Top categories: {', '.join(c['category__name'] for c in top_categories) or 'N/A'}\n"
-            f"- Top buildings: {', '.join(b['building__name'] for b in top_buildings) or 'N/A'}\n\n"
+            f"- Top category: {top_cat_name}\n"
+            f"- Top building: {top_bld_name}\n\n"
             f"Write a short, professional weekly summary report in Polish."
         )
 
@@ -270,7 +277,7 @@ def generate_weekly_report():
             },
         }
 
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 response = requests.post(
                     hf_url, headers=headers, json=payload, timeout=60
@@ -279,9 +286,9 @@ def generate_weekly_report():
                 if response.status_code == 503:
                     logger.warning(
                         "generate_weekly_report: HF API returned 503 (model loading), "
-                        "retrying in 20s (attempt %d/2)", attempt + 1,
+                        "retrying in 30s (attempt %d/3)", attempt + 1,
                     )
-                    time.sleep(20)
+                    time.sleep(30)
                     continue
 
                 response.raise_for_status()
@@ -298,11 +305,11 @@ def generate_weekly_report():
 
             except requests.RequestException as exc:
                 logger.exception(
-                    "generate_weekly_report: HF API request failed (attempt %d/2): %s",
+                    "generate_weekly_report: HF API request failed (attempt %d/3): %s",
                     attempt + 1, exc,
                 )
-                if attempt == 0:
-                    time.sleep(20)
+                if attempt < 2:
+                    time.sleep(30)
                 continue
     else:
         logger.info(
