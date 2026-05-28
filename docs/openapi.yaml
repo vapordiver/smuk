@@ -2,7 +2,7 @@ openapi: "3.0.3"
 
 info:
   title: SMUK API — System Monitorowania Usterek Kampusu
-  version: "1.3.0"
+  version: "1.4.0"
   description: |
     REST API dla systemu zgłaszania i zarządzania usterkami na terenie kampusu uczelni.
 
@@ -16,6 +16,13 @@ info:
     ## Role
     - **reporter** — domyślna rola (studenci, pracownicy). Może zgłaszać usterki i przeglądać swoje.
     - **coordinator** — zarządza zgłoszeniami, zmienia statusy, widzi panel admina.
+
+    ## Cron Jobs (Celery Beat)
+    Backend ma dwa zadania cykliczne uruchamiane codziennie o 03:00 UTC (poza HTTP):
+    - `compress_old_images` — zdjęcia ticketów >30 dni są re-kompresowane do WEBP 60% (z markerem `_q60` w nazwie pliku, idempotentnie). SMUK-26.
+    - `archive_old_tickets` — tickety >365 dni dostają status `ARCHIVED` z wpisem w `AuditLog` (user: null). SMUK-26.
+
+    Te zadania nie są endpointami HTTP — wpływają jedynie na stan danych zwracanych przez `/api/tickets/...`. Implementacja: `tickets/tasks.py`.
 
 servers:
   - url: http://localhost:8000
@@ -258,13 +265,26 @@ components:
           $ref: "#/components/schemas/GeoJSONPoint"
         reporter:
           $ref: "#/components/schemas/UserShort"
+        assigned_to:
+          allOf:
+            - $ref: "#/components/schemas/UserShort"
+          nullable: true
         image:
           type: string
-          description: Ścieżka do pliku zdjęcia (lokalnie lub S3)
-          example: tickets/42/photo.webp
+          description: |
+            Pełna URL pliku zdjęcia generowana przez Django (`request.build_absolute_uri`).
+            Lokalnie: `http://backend:8000/media/tickets/...`. Na S3: presigned URL.
+          example: "http://backend:8000/media/tickets/2026/05/28/abc123.webp"
         created_at:
           type: string
           format: date-time
+        audit_log:
+          type: array
+          description: |
+            Historia zmian — obecna również w listingu (nie tylko w `TicketDetail`),
+            zgodnie z implementacją `TicketListSerializer`.
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
 
     # --- Ticket (pełny) ---
     TicketDetail:
@@ -296,8 +316,10 @@ components:
           $ref: "#/components/schemas/GeoJSONPoint"
         image:
           type: string
-          description: Ścieżka do pliku zdjęcia
-          example: tickets/42/photo.webp
+          description: |
+            Pełna URL pliku zdjęcia generowana przez Django (`request.build_absolute_uri`).
+            Lokalnie: `http://backend:8000/media/tickets/...`. Na S3: presigned URL.
+          example: "http://backend:8000/media/tickets/2026/05/28/abc123.webp"
         reporter:
           $ref: "#/components/schemas/UserShort"
         assigned_to:
@@ -326,15 +348,26 @@ components:
         id:
           type: integer
         user:
-          $ref: "#/components/schemas/UserShort"
+          allOf:
+            - $ref: "#/components/schemas/UserShort"
+          nullable: true
+          description: |
+            `null` dla zmian systemowych (np. cron `archive_old_tickets` z SMUK-26 — automatyczna archiwizacja po 365 dniach).
         field_changed:
           type: string
+          enum: [status, priority, assigned_to, note]
           example: status
+          description: |
+            - `status` / `priority` — standardowe zmiany przez koordynatora
+            - `assigned_to` — wartości `old_value`/`new_value` są **rozwijane do "Imię Nazwisko"** w serializerze (nie surowe UUID)
+            - `note` — komentarz koordynatora (tylko `new_value` wypełnione, `old_value` puste)
         old_value:
           type: string
+          nullable: true
           example: NEW
         new_value:
           type: string
+          nullable: true
           example: IN_PROGRESS
         created_at:
           type: string
@@ -440,7 +473,26 @@ components:
           properties:
             code:
               type: string
+              enum:
+                - VALIDATION_ERROR
+                - IMAGE_PROCESSING_ERROR
+                - AUTHENTICATION_ERROR
+                - PERMISSION_DENIED
+                - NOT_FOUND
+                - RATE_LIMIT_EXCEEDED
+                - ERROR
               example: VALIDATION_ERROR
+              description: |
+                Mapowanie statusów HTTP na kody błędów (`TicketViewSet.handle_exception`):
+                - `400` → `VALIDATION_ERROR` lub `IMAGE_PROCESSING_ERROR`
+                - `401` → `AUTHENTICATION_ERROR`
+                - `403` → `PERMISSION_DENIED`
+                - `404` → `NOT_FOUND`
+                - `429` → `RATE_LIMIT_EXCEEDED` (od SMUK-25)
+                - `500` → `ERROR`
+
+                Dotyczy endpointów `/api/tickets/...`. Endpointy `/api/auth/...` i słownikowe
+                używają domyślnych odpowiedzi DRF — bez wrappera `error.code`.
             message:
               type: string
               example: Lokalizacja znajduje się poza terenem kampusu.
@@ -543,6 +595,31 @@ paths:
         "401":
           description: Brak tokenu JWT
 
+  /api/auth/coordinators/:
+    get:
+      tags: [Auth]
+      summary: Lista koordynatorów (Koordynator)
+      description: |
+        Zwraca listę wszystkich użytkowników z rolą `coordinator`. **Bez paginacji** — zwraca pełną listę.
+        Używana przez UI panelu koordynatora w dropdownie „przypisz do…" przy edycji ticketu.
+
+        Wymaga przynależności do grupy Django `COORDINATOR` (uppercase), nie tylko pola `User.role`.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista koordynatorów
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Brak/nieprawidłowy JWT
+        "403":
+          description: Użytkownik nie jest w grupie `COORDINATOR`
+
   # ═══════════════════════════════════════════════════════
   # TICKETS
   # ═══════════════════════════════════════════════════════
@@ -583,14 +660,22 @@ paths:
                   type: integer
                   nullable: true
                   example: 5
+                  description: |
+                    FK do `Building`. Jeśli podany, lokalizacja GPS musi być max 300m od poligonu/centroidu budynku
+                    (PostGIS `ST_DWithin`). Niezgodność → `400 VALIDATION_ERROR` (`details.location`).
                 floor:
                   type: integer
                   nullable: true
                   example: 2
+                  description: |
+                    ⚠️ **Obecnie ignorowane przy POST** — pole zakomentowane w `TicketCreateSerializer`.
+                    Można ustawić tylko przez Django Admin lub PATCH koordynatora.
                 room:
                   type: string
                   nullable: true
                   example: "204"
+                  description: |
+                    ⚠️ **Obecnie ignorowane przy POST** (tak samo jak `floor`).
                 latitude:
                   type: number
                   format: float
@@ -602,7 +687,10 @@ paths:
                 image:
                   type: string
                   format: binary
-                  description: "Zdjęcie usterki (JPEG/PNG, max 10MB)"
+                  description: |
+                    Zdjęcie usterki. Walidacja: max 10 MB, Content-Type `image/jpeg` lub `image/png`.
+                    Backend kompresuje do WEBP 85%, max 1920px szerokości (`tickets/utils.py:compress_image_to_webp`).
+                    Przy błędzie kompresji → `400 IMAGE_PROCESSING_ERROR`.
       responses:
         "201":
           description: Zgłoszenie utworzone
@@ -611,7 +699,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/TicketDetail"
         "400":
-          description: "Błąd walidacji lub geofencing (lokalizacja poza kampusem)"
+          description: |
+            Błąd walidacji. Możliwe wartości `error.code`:
+            - `VALIDATION_ERROR` — geofencing kampusu, lokalizacja >300m od budynku, brak pól, opis <10 znaków
+            - `IMAGE_PROCESSING_ERROR` — Pillow nie był w stanie odczytać/zwalidować obrazu
           content:
             application/json:
               schema:
@@ -659,6 +750,12 @@ paths:
           schema:
             type: string
             enum: [created_at, -created_at, priority, -priority, status]
+        - name: search
+          in: query
+          description: |
+            Wyszukiwanie pełnotekstowe (DRF SearchFilter) po polach `title`, `description`, `id`.
+          schema:
+            type: string
         - name: limit
           in: query
           schema:
@@ -738,6 +835,15 @@ paths:
                   type: string
                   format: uuid
                   nullable: true
+                  description: |
+                    UUID użytkownika z grupy `COORDINATOR` (lista przez `GET /api/auth/coordinators/`).
+                    Wartość `null` cofa przypisanie.
+                note:
+                  type: string
+                  writeOnly: true
+                  description: |
+                    Opcjonalna notatka koordynatora. Nie pojawia się w response, ale tworzy wpis w
+                    `AuditLog` z `field_changed="note"` i `new_value=<treść>`.
             #                resolution_note:
             #                  type: string
             #                  description: Wymagana przy zmianie statusu na RESOLVED
@@ -745,6 +851,7 @@ paths:
               #             status: RESOLVED
               priority: HIGH
               assigned_to_id: "123e4567-e89b-12d3-a456-426614174000"
+              note: "Rura wymieniona, przeciek naprawiony."
       # resolution_note: "Rura wymieniona, przeciek naprawiony."
       responses:
         "200":
