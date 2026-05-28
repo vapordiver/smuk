@@ -165,6 +165,7 @@ CSRF_TRUSTED_ORIGINS = [
 # Celery
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+CELERY_TIMEZONE = "Europe/Warsaw"
 CELERY_BEAT_SCHEDULE = {
     "compress_old_images_daily": {
         "task": "tickets.tasks.compress_old_images",
@@ -174,8 +175,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "tickets.tasks.archive_old_tickets",
         "schedule": crontab(hour=3, minute=0),
     },
+    "generate-weekly-report-friday-15": {
+        "task": "tickets.tasks.generate_weekly_report",
+        "schedule": crontab(hour=15, minute=0, day_of_week=5),
+    },
 }
-# Celery Beat schedule - TODO: add weekly report task
+
+# Hugging Face API
+HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY", "")
 
 # Media files & AWS S3
 
