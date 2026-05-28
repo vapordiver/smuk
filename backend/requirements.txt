@@ -21,3 +21,6 @@ django-storages==1.14.6
 
 # Konfiguracja
 django-environ==0.13.0
+
+# HTTP
+requests>=2.31,<3
