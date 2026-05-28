@@ -4,6 +4,7 @@ from django.contrib.gis.db import models as gis_models
 from django.utils import timezone
 from django.core.validators import RegexValidator
 import uuid
+from django.utils.translation import gettext_lazy as _
 
 def ticket_image_upload_path(instance, filename):
     """
@@ -175,3 +176,16 @@ class Campus(models.Model):
 
     def __str__(self):
         return self.name
+
+class WeeklyReport(models.Model):
+    week_start = models.DateTimeField(verbose_name=_("Początek tygodnia"))
+    week_end = models.DateTimeField(verbose_name=_("Koniec tygodnia"))
+    content = models.TextField(blank=True, null=True, verbose_name=_("Wygenerowany raport AI"))
+    raw_stats = models.JSONField(default=dict, verbose_name=_("Surowe Statystyki JSON"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Utworzono"))
+
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Raport tygodniowy: {self.week_start.date() - self.week_end.date()}"
