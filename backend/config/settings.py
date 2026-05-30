@@ -127,12 +127,10 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 20,
-    # Rate limiting
-    'DEFAULT_THROTTLE_CLASSES': [
-        'tickets.throttles.TicketCreateThrottle',
-    ],
+    # Rate limiting — klasa throttle wstrzykiwana per-widok przez get_throttles(),
+    # nie globalnie, żeby nie dotykać innych endpointów (np. logowania).
     'DEFAULT_THROTTLE_RATES': {
-        'ticket_create': '11/5min',
+        'ticket_create': '2/5m',
     },
 }
 
