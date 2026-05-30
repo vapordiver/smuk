@@ -126,6 +126,13 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 20,
+    # Rate limiting
+    'DEFAULT_THROTTLE_CLASSES': [
+        'tickets.throttles.TicketCreateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'ticket_create': '11/5min',
+    },
 }
 
 
@@ -161,6 +168,18 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',
     'https://*.ngrok-free.dev',
 ]
+
+# Cache — Redis (używany m.in. przez DRF throttle)
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL", "redis://redis:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "smuk",
+    },
+}
 
 # Celery
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")

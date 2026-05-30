@@ -12,6 +12,7 @@ from .models import Building, FaultCategory, Ticket, Campus, AuditLog
 from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
+from .throttles import TicketCreateThrottle
 from django.contrib.gis.geos import Polygon
 from django.contrib.gis.db.models.functions import SnapToGrid
 from django.db import transaction
@@ -79,12 +80,19 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
     `GET /api/tickets/`      (list)
     `GET /api/tickets/<id>/` (retrieve)
     `GET /api/tickets/my/`   (get_my_tickets)
-    `POST /api/tickets/`     (create)
+    `POST /api/tickets/`     (create)  → throttle: at 11th ticket in 5 mins response with "Too many requests. Please try again later." with 429 
     """
     filter_backends = [DjangoFilterBackend, OrderingFilter, filters.SearchFilter]
     filterset_class = TicketFilter
     ordering_fields = ['created_at', 'priority', 'status']
     search_fields = ['title', 'description', 'id']
+
+    def get_throttles(self):
+        """Apply rate limiting only on ticket creation (POST)."""
+        if self.action == 'create':
+            return [TicketCreateThrottle()]
+        return []
+
 
     def handle_exception(self, exc):
         response = super().handle_exception(exc)
