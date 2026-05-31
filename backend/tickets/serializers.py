@@ -26,6 +26,7 @@ class BuildingSerializer(serializers.ModelSerializer):
             }
         return None
 
+
 class CampusSerializer(serializers.ModelSerializer):
     polygon = serializers.SerializerMethodField()
 
@@ -87,6 +88,16 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
         return data
 
 
+class ParentTicketShortSerializer(serializers.ModelSerializer):
+    """
+    Mini-serializer to fetch basic details of the parent ticket
+    """
+
+    class Meta:
+        model = Ticket
+        fields = ["id", "status", "image", "title"]
+
+
 class TicketListSerializer(serializers.ModelSerializer):
     """
     (`TicketListItem` in API contract)
@@ -96,12 +107,14 @@ class TicketListSerializer(serializers.ModelSerializer):
     reporter = UserShortSerializer(read_only=True)
     assigned_to = UserShortSerializer(read_only=True)
     audit_log = AuditLogEntrySerializer(source="audit_logs", many=True, read_only=True)
+    parent_details = ParentTicketShortSerializer(source="parent_ticket", read_only=True)
 
     class Meta:
         model = Ticket
         fields = [
             "id", "title", "description", "status", "priority", "category",
-            "building", "floor", "room", "reporter", "assigned_to", "location", "image", "created_at", "audit_log", "parent_ticket"
+            "building", "floor", "room", "reporter", "assigned_to", "location", "image", "created_at", "audit_log",
+            "parent_ticket", "parent_details"
         ]
 
 
@@ -116,13 +129,14 @@ class TicketDetailSerializer(serializers.ModelSerializer):
     location = serializers.SerializerMethodField()
     reporter = UserShortSerializer(read_only=True)
     assigned_to = UserShortSerializer(read_only=True)
+    parent_details = ParentTicketShortSerializer(source="parent_ticket", read_only=True)
 
     class Meta:
         model = Ticket
         fields = [
             "id", "title", "description", "category", "building",
             "floor", "room", "status", "priority", "location", "image",
-            "reporter", "assigned_to", "parent_ticket", "created_at",
+            "reporter", "assigned_to", "parent_ticket", "parent_details", "created_at",
             "updated_at",
             "audit_log"
         ]
@@ -139,6 +153,7 @@ class TicketDetailSerializer(serializers.ModelSerializer):
             }
         return None
 
+
 class TicketCreateSerializer(serializers.Serializer):
     """
     Serializer used when creating a new ticket (POST /api/tickets/).
@@ -148,8 +163,8 @@ class TicketCreateSerializer(serializers.Serializer):
     description = serializers.CharField(min_length=10)
     category_id = serializers.IntegerField()
     building_id = serializers.IntegerField(required=False)
-    #floor = serializers.IntegerField(required=False)
-    #room = serializers.CharField(required=False)
+    # floor = serializers.IntegerField(required=False)
+    # room = serializers.CharField(required=False)
     latitude = serializers.FloatField(min_value=-90, max_value=90)
     longitude = serializers.FloatField(min_value=-180, max_value=180)
     image = serializers.ImageField()
@@ -158,7 +173,7 @@ class TicketCreateSerializer(serializers.Serializer):
         """
         Validate image size (max 10MB) and file type (JPEG/PNG only).
         """
-        if value.size > 10 * 1024 * 1024: # 10MB
+        if value.size > 10 * 1024 * 1024:  # 10MB
             raise serializers.ValidationError("Image file too large (max 10MB).")
 
         allowed_types = ['image/jpeg', 'image/png']
@@ -234,6 +249,7 @@ class TicketCreateSerializer(serializers.Serializer):
 
         return attrs
 
+
 class TicketUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer used for updating ticket status, priority, and assigned_to (PATCH /api/tickets/<id>/).
@@ -253,6 +269,7 @@ class TicketUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("User with this ID does not exist.")
         return value
 
+
 class NearbyTicketSerializer(serializers.ModelSerializer):
     """
     Serializer used to get nearby tickets, used for checking duplicate reports.
@@ -269,7 +286,7 @@ class NearbyTicketSerializer(serializers.ModelSerializer):
             try:
                 dist_in_meters = obj.distance.m
             except AttributeError:
-                #If postgis returns distance in DEGREES (SOMEHOW POSSIBLE) recalc to meters
-                dist_in_meters = obj.distance*111320
+                # If postgis returns distance in DEGREES (SOMEHOW POSSIBLE) recalc to meters
+                dist_in_meters = obj.distance * 111320
             return round(dist_in_meters, 2)
         return None

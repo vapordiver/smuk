@@ -134,7 +134,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         return TicketDetailSerializer
 
     def get_queryset(self):
-        qs = Ticket.objects.select_related('reporter', 'category', 'building', 'assigned_to')
+        qs = Ticket.objects.select_related('reporter', 'category', 'building', 'assigned_to', 'parent_ticket')
 
         if self.action == 'list':
             return qs

@@ -122,16 +122,17 @@ const getAuditChangeText = (entry) => {
 
 //ticket card display
 const TicketCard = ({ticket, onClick}) => {
+    const displayImage = ticket.image || ticket.parent_details?.image;
     return (
         <div
             className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row h-full cursor-pointer"
             onClick={() => onClick(ticket)}>
             {/* image section */}
             <div className="md:w-1/3 relative h-48 md:h-auto overflow-hidden bg-slate-100">
-                {ticket.image ? (
+                {displayImage ? (
                     <img
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        src={getImageUrl(ticket.image)}
+                        src={getImageUrl(displayImage)}
                         alt={ticket.title}
                     />
                 ) : (
@@ -196,15 +197,27 @@ const TicketModal = ({ticket, onClose}) => {
                 </div>
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
                     {/* --- Duplicate info --- */}
-                    {ticket.parent_ticket && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
-                            <span className="material-symbols-outlined text-amber-600 mt-0.5">link</span>
-                            <div>
-                                <h5 className="font-bold text-amber-800 text-sm">Zgłoszenie połączone (Duplikat)</h5>
-                                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                                    To zgłoszenie zostało oznaczone jako duplikat i podpięte pod zgłoszenie główne
-                                    <strong className="ml-1 text-amber-950 font-extrabold">#REP-{ticket.parent_ticket}</strong>.
-                                </p>
+                                        {ticket.parent_details && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3">
+                            <div className="flex items-start gap-3">
+                                <span className="material-symbols-outlined text-amber-600 mt-0.5">link</span>
+                                <div>
+                                    <h5 className="font-bold text-amber-800 text-sm">Zgłoszenie połączone (Duplikat)</h5>
+                                    <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                                        To zgłoszenie zostało oznaczone jako duplikat i podpięte pod zgłoszenie główne
+                                        <strong className="ml-1 text-amber-950 font-extrabold">#REP-{ticket.parent_details.id}</strong>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info about parent ticket */}
+                            <div className="bg-white/80 border border-amber-100 rounded-xl p-3 pl-4 flex flex-col gap-1.5 text-xs text-amber-900">
+                                <p><strong>Tytuł główny:</strong> {ticket.parent_details.title}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <strong>Status główny:</strong>
+                                    <StatusBadge status={mapStatusToBadge(ticket.parent_details.status)}/>
+                                    <span className="text-[10px] text-amber-800">({mapStatusToPolish(ticket.parent_details.status)})</span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -243,15 +256,15 @@ const TicketModal = ({ticket, onClose}) => {
                     </div>
 
                     {/* Image */}
-                    {ticket.image && (
+                    {(ticket.image || ticket.parent_details?.image) && (
                         <div>
                             <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
                                 <span className="material-symbols-outlined">photo_camera</span>
-                                Zdjęcie usterki
+                                {ticket.image ? "Zdjęcie usterki" : "Zdjęcie ze zgłoszenia głównego"}
                             </h4>
                             <img
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                src={getImageUrl(ticket.image)}
+                                className="w-full h-full object-cover rounded-2xl max-h-96 border border-slate-200"
+                                src={getImageUrl(ticket.image || ticket.parent_details.image)}
                                 alt={ticket.title}
                             />
                         </div>
