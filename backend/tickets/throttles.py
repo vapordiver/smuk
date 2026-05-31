@@ -8,16 +8,16 @@ from rest_framework.throttling import SimpleRateThrottle
 
 class TicketCreateThrottle(SimpleRateThrottle):
     """
-    Rate limiter dla POST /api/tickets/.
-    Scope: 'ticket_create'  →  konfiguracja w DEFAULT_THROTTLE_RATES.
-    Licznik przechowywany w Django cache (Redis, db=1).
-    Wyłączany przez zmienną środowiskową RATE_LIMIT_ENABLED=False.
+    Rate limiter for POST /api/tickets/.
+    Scope: 'ticket_create'  →  configured in DEFAULT_THROTTLE_RATES.
+    Counter stored in Django cache (Redis, db=1).
+    Can be disabled via the RATE_LIMIT_ENABLED=False environment variable.
 
-    Obsługiwany format rate: 'N/[X]unit'
-      unit: s | m | h | d  (sekunda, minuta, godzina, dzień)
-      X – opcjonalny mnożnik, np. '11/5min' = 11 req / 300 s
-    Standardowy DRF obsługuje tylko 'N/unit' (bez mnożnika) —
-    stąd nadpisanie parse_rate.
+    Supported rate format: 'N/[X]unit'
+      unit: s | m | h | d  (second, minute, hour, day)
+      X – optional multiplier, e.g. '11/5min' = 11 req / 300 s
+    Standard DRF only supports 'N/unit' (without multiplier) —
+    hence the parse_rate override.
     """
 
     scope = 'ticket_create'
@@ -28,9 +28,9 @@ class TicketCreateThrottle(SimpleRateThrottle):
 
     def parse_rate(self, rate):
         """
-        Rozszerza domyślny parser DRF o mnożnik czasu.
+        Extends the default DRF parser with a time multiplier.
 
-        Przykłady:
+        Examples:
             '11/5min'  →  (11, 300)
             '100/day'  →  (100, 86400)
             '5/m'      →  (5, 60)
@@ -44,8 +44,8 @@ class TicketCreateThrottle(SimpleRateThrottle):
         match = re.fullmatch(r'(\d+)?\s*([smhd])', period.strip().lower())
         if not match:
             raise ValueError(
-                f"Nieprawidłowy format throttle rate: '{rate}'. "
-                "Oczekiwany: 'N/[X]unit' gdzie unit ∈ {{s,m,h,d}}, np. '11/5min'."
+                f"Invalid throttle rate format: '{rate}'. "
+                "Expected: 'N/[X]unit' where unit ∈ {{s,m,h,d}}, e.g. '11/5min'."
             )
 
         multiplier = int(match.group(1)) if match.group(1) else 1
@@ -59,7 +59,7 @@ class TicketCreateThrottle(SimpleRateThrottle):
     # ------------------------------------------------------------------ #
 
     def get_cache_key(self, request, view):
-        """Klucz per-user (pk) dla zalogowanych, per-IP dla anonimowych."""
+        """Per-user (pk) key for authenticated users, per-IP for anonymous."""
         if request.user and request.user.is_authenticated:
             ident = request.user.pk
         else:
@@ -71,7 +71,7 @@ class TicketCreateThrottle(SimpleRateThrottle):
     # ------------------------------------------------------------------ #
 
     def allow_request(self, request, view):
-        """Pomija throttling gdy RATE_LIMIT_ENABLED=False."""
+        """Bypasses throttling when RATE_LIMIT_ENABLED=False."""
         if not getattr(settings, 'RATE_LIMIT_ENABLED', True):
             return True
         return super().allow_request(request, view)
@@ -81,7 +81,7 @@ class TicketCreateThrottle(SimpleRateThrottle):
     # ------------------------------------------------------------------ #
 
     def _build_error(self, wait):
-        """Buduje czytelny słownik błędu zwracany przy przekroczeniu limitu."""
+        """Builds a human-readable error dict returned when the rate limit is exceeded."""
         wait_seconds = math.ceil(wait) if wait is not None else 300
         minutes, seconds = divmod(wait_seconds, 60)
 
@@ -93,12 +93,12 @@ class TicketCreateThrottle(SimpleRateThrottle):
         return {
             "code": "RATE_LIMIT_EXCEEDED",
             "message": (
-                "Przekroczyłeś limit zgłoszeń. "
-                f"Spróbuj ponownie za {wait_human}."
+                "You have exceeded the submission limit. "
+                f"Please try again in {wait_human}."
             ),
             "retry_after_seconds": wait_seconds,
         }
 
     def throttle_failure(self):
-        """Wywoływane przez DRF kiedy throttle zwraca False – rzuca Throttled."""
+        """Called by DRF when the throttle returns False — raises Throttled."""
         raise Throttled(detail={"error": self._build_error(self.wait())})
