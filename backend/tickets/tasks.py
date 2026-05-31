@@ -251,8 +251,11 @@ def generate_weekly_report():
     api_key = getattr(settings, "HUGGINGFACE_API_KEY", None)
 
     if api_key:
-        hf_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
-        headers = {"Authorization": f"Bearer {api_key}"}
+        hf_url = "https://router.huggingface.co/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
         top_cat_name = top_category_row["category__name"] if top_category_row else "N/A"
         top_bld_name = top_building_row["building__name"] if top_building_row else "N/A"
@@ -269,12 +272,10 @@ def generate_weekly_report():
         )
 
         payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 250,
-                "temperature": 0.3,
-                "return_full_text": False,
-            },
+            "model" : "Qwen/Qwen2.5-7B-Instruct",
+            "messages" : [{"role": "user", "content" : prompt}],
+            "max_tokens": 250,
+            "temperature" : 0.3,
         }
 
         for attempt in range(3):
@@ -294,8 +295,8 @@ def generate_weekly_report():
                 response.raise_for_status()
                 result = response.json()
 
-                if isinstance(result, list) and len(result) > 0:
-                    content = result[0].get("generated_text", "")
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0]["message"].get("content", "")
                 else:
                     logger.warning(
                         "generate_weekly_report: unexpected HF API response format: %s",
@@ -303,7 +304,7 @@ def generate_weekly_report():
                     )
                 break
 
-            except requests.RequestException as exc:
+            except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
                 logger.exception(
                     "generate_weekly_report: HF API request failed (attempt %d/3): %s",
                     attempt + 1, exc,
