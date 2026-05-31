@@ -982,6 +982,13 @@ paths:
                           type: integer
                         title:
                           type: string
+                        description:
+                          type: string
+                          nullable: true
+                        image:
+                          type: string
+                          format: uri
+                          nullable: true
                         status:
                           $ref: "#/components/schemas/TicketStatus"
                         category:

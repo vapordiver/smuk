@@ -11,11 +11,9 @@ from .models import Building, FaultCategory, Ticket, Campus, AuditLog
 from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, NearbyTicketSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
-from django.contrib.gis.geos import Polygon
+from django.contrib.gis.geos import Polygon, Point
 from django.contrib.gis.db.models.functions import SnapToGrid, Distance
 from django.contrib.gis.measure import D
-from django.contrib.gis.geos import Polygon, Point
-from django.db import transaction
 from django.db.models import Count
 from .tasks import calculate_priority
 
