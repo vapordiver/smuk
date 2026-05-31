@@ -175,7 +175,7 @@ const TicketCard = ({ticket, onClick}) => {
 const TicketModal = ({ticket, onClose}) => {
     if (!ticket) return null;
     // Leaflet expects [lat, lng] - coordinates from DB are [lng, lat]
-    const position=getCoordinates(ticket.location)
+    const position = getCoordinates(ticket.location)
     const hasAuditLog = ticket.audit_log && ticket.audit_log.length > 0;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
@@ -197,27 +197,25 @@ const TicketModal = ({ticket, onClose}) => {
                 </div>
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
                     {/* --- Duplicate info --- */}
-                                        {ticket.parent_details && (
+                    {ticket.parent_details && (
                         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3">
                             <div className="flex items-start gap-3">
                                 <span className="material-symbols-outlined text-amber-600 mt-0.5">link</span>
                                 <div>
-                                    <h5 className="font-bold text-amber-800 text-sm">Zgłoszenie połączone (Duplikat)</h5>
+                                    <h5 className="font-bold text-amber-800 text-sm">Zgłoszenie połączone
+                                        (Duplikat)</h5>
                                     <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
                                         To zgłoszenie zostało oznaczone jako duplikat i podpięte pod zgłoszenie główne
-                                        <strong className="ml-1 text-amber-950 font-extrabold">#REP-{ticket.parent_details.id}</strong>.
+                                        <strong
+                                            className="ml-1 text-amber-950 font-extrabold">#REP-{ticket.parent_details.id}</strong>.
                                     </p>
                                 </div>
                             </div>
 
                             {/* Info about parent ticket */}
-                            <div className="bg-white/80 border border-amber-100 rounded-xl p-3 pl-4 flex flex-col gap-1.5 text-xs text-amber-900">
-                                <p><strong>Tytuł główny:</strong> {ticket.parent_details.title}</p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <strong>Status główny:</strong>
-                                    <StatusBadge status={mapStatusToBadge(ticket.parent_details.status)}/>
-                                    <span className="text-[10px] text-amber-800">({mapStatusToPolish(ticket.parent_details.status)})</span>
-                                </div>
+                            <div
+                                className="bg-white/80 border border-amber-100 rounded-xl p-3 pl-4 flex flex-col gap-1.5 text-xs text-amber-900">
+                                <p><strong>Tytuł zgłoszenia głównego:</strong> {ticket.parent_details.title}</p>
                             </div>
                         </div>
                     )}

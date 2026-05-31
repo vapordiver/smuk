@@ -392,10 +392,11 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
         point = Point(lng, lat, srid=4326)
 
-        # ONLY OPEN TICKETS
+        # ONLY OPEN TICKETS AND NOT SUBTICKETS
         queryset = self.get_queryset().filter(
             category_id=category_id,
             status__in=['NEW', 'IN_PROGRESS', 'NEEDS_REVIEW'],
+            parent_ticket__isnull=True,
             location__distance_lte=(point, D(m=radius))
         ).annotate(
             distance=Distance('location', point)
@@ -415,6 +416,18 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         confirms pinning the duplicate ticket
         """
         parent_ticket = self.get_object()
+
+        if parent_ticket.parent_ticket_id is not None:
+            return Response(
+                {
+                    "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Subticket cannot be a parent ticket."
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         new_ticket_data = request.data.get('new_ticket_data')
 
         if not new_ticket_data:
@@ -440,13 +453,15 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 description=new_ticket_data.get('description', ''),
                 category_id=new_ticket_data.get('category_id', parent_ticket.category_id),
                 location=point,
+                building=parent_ticket.building,
+                priority=parent_ticket.priority,
                 reporter=request.user,
                 parent_ticket=parent_ticket,
-                status='NEW'
+                status=parent_ticket.status
             )
 
         return Response({
-            "message": "Zgłoszenie zostało pomyślnie podpięte pod istniejącą usterkę.",
+            "message": "Successfully pinned this ticket as a subticket.",
             "parent_ticket_id": parent_ticket.id,
             "child_ticket_id": child_ticket.id,
             "verification_status": "CONFIRMED_MANUALLY"
