@@ -1,5 +1,4 @@
 import logging
-
 from rest_framework import generics, viewsets, mixins, status, filters
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -9,11 +8,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
 from .models import Building, FaultCategory, Ticket, Campus, AuditLog
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, NearbyTicketSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
 from django.contrib.gis.geos import Polygon
-from django.contrib.gis.db.models.functions import SnapToGrid
+from django.contrib.gis.db.models.functions import SnapToGrid, Distance
+from django.contrib.gis.measure import D
+from django.contrib.gis.geos import Polygon, Point
 from django.db import transaction
 from django.db.models import Count
 from .tasks import calculate_priority
@@ -36,7 +37,6 @@ def _format_user_display(user_id):
     return full_name or user.email or str(user.id)
 
 
-
 class BuildingsListView(generics.ListAPIView):
     """
     GET /api/buildings/
@@ -48,6 +48,8 @@ class BuildingsListView(generics.ListAPIView):
     authentication_classes = []
     permission_classes = [AllowAny]
     pagination_class = None
+
+
 class CampusListView(generics.ListAPIView):
     """
     GET /api/campuses/
@@ -230,6 +232,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         }
 
         return Response(geojson_dict)
+
     @action(detail=False, methods=['get'], url_path='heatmap-data', permission_classes=[IsAuthenticated])
     def heatmap_data(self, request):
         """
@@ -358,3 +361,93 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
         output_serializer = TicketDetailSerializer(ticket)
         return Response(output_serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='nearby', permission_classes=[IsAuthenticated])
+    def nearby(self, request):
+        """
+        GET /api/tickets/nearby/?lat=X&lng=Y&category_id=Z&radius=50
+        searches for similar and OPEN tickets in the radius
+        """
+        lat = request.query_params.get('lat')
+        lng = request.query_params.get('lng')
+        category_id = request.query_params.get('category_id')
+        radius = request.query_params.get('radius', 50)
+
+        if not lat or not lng or not category_id:
+            return Response(
+                {"error": {"code": "VALIDATION_ERROR", "message": "Missing lat, lng, or category_id."}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            lat = float(lat)
+            lng = float(lng)
+            category_id = int(category_id)
+            radius = float(radius)
+        except ValueError:
+            return Response(
+                {"error": {"code": "VALIDATION_ERROR", "message": "Invalid parameter types."}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        point = Point(lng, lat, srid=4326)
+
+        # ONLY OPEN TICKETS
+        queryset = self.get_queryset().filter(
+            category_id=category_id,
+            status__in=['NEW', 'IN_PROGRESS', 'NEEDS_REVIEW'],
+            location__distance_lte=(point, D(m=radius))
+        ).annotate(
+            distance=Distance('location', point)
+        ).order_by('distance')
+
+        serializer = NearbyTicketSerializer(queryset, many=True)
+
+        return Response({
+            "count": queryset.count(),
+            "results": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='confirm-duplicate', permission_classes=[IsAuthenticated])
+    def confirm_duplicate(self, request, pk=None):
+        """
+        POST /api/tickets/<id>/confirm-duplicate/
+        confirms pinning the duplicate ticket
+        """
+        parent_ticket = self.get_object()
+        new_ticket_data = request.data.get('new_ticket_data')
+
+        if not new_ticket_data:
+            return Response(
+                {"error": {"code": "VALIDATION_ERROR", "message": "Field new_ticket_data is required."}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            lat = float(new_ticket_data.get('latitude'))
+            lng = float(new_ticket_data.get('longitude'))
+            point = Point(lng, lat, srid=4326)
+        except(TypeError, ValueError):
+            return Response(
+                {"error": {"code": "VALIDATION_ERROR", "message": "Invalid coordinates."}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # pinning the ticket without the img, cosiek add AI here my compadre
+        with transaction.atomic():
+            child_ticket = Ticket.objects.create(
+                title=new_ticket_data.get('title', parent_ticket.title),
+                description=new_ticket_data.get('description', ''),
+                category_id=new_ticket_data.get('category_id', parent_ticket.category_id),
+                location=point,
+                reporter=request.user,
+                parent_ticket=parent_ticket,
+                status='NEW'
+            )
+
+        return Response({
+            "message": "Zgłoszenie zostało pomyślnie podpięte pod istniejącą usterkę.",
+            "parent_ticket_id": parent_ticket.id,
+            "child_ticket_id": child_ticket.id,
+            "verification_status": "CONFIRMED_MANUALLY"
+        }, status=status.HTTP_201_CREATED)

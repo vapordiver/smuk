@@ -40,7 +40,7 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
 
         reporter = User.objects.filter(
-            email="coord1@p.lodz.pl"
+            email="reporter1@edu.p.lodz.pl"
         ).first()
 
         if not reporter:

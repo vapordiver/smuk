@@ -266,5 +266,10 @@ class NearbyTicketSerializer(serializers.ModelSerializer):
 
     def get_distance(self, obj):
         if hasattr(obj, "distance") and obj.distance is not None:
-            return round(obj.distance, 2)
+            try:
+                dist_in_meters = obj.distance.m
+            except AttributeError:
+                #If postgis returns distance in DEGREES (SOMEHOW POSSIBLE) recalc to meters
+                dist_in_meters = obj.distance*111320
+            return round(dist_in_meters, 2)
         return None
