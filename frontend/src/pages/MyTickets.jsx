@@ -67,6 +67,24 @@ const getImageUrl = (imagePath) => {
     return imagePath;
 };
 
+const getCoordinates = (location) => {
+    if (!location) return [51.7535, 19.4520]; //fallback on location on campus a
+    //geojson object
+    if (location.coordinates && Array.isArray(location.coordinates)) {
+        return [location.coordinates[1], location.coordinates[0]];
+    }
+    //pointfield text
+    if (typeof location === 'string') {
+        const match = location.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+        if (match) {
+            const lng = parseFloat(match[1]);
+            const lat = parseFloat(match[2]);
+            return [lat, lng];
+        }
+    }
+    return [51.7535, 19.4520];//fallback on location on campus a
+};
+
 const getAuditFieldLabel = (fieldChanged) => {
     const labels = {
         status: 'status',
@@ -156,9 +174,7 @@ const TicketCard = ({ticket, onClick}) => {
 const TicketModal = ({ticket, onClose}) => {
     if (!ticket) return null;
     // Leaflet expects [lat, lng] - coordinates from DB are [lng, lat]
-    const position = ticket.location?.coordinates
-        ? [ticket.location.coordinates[1], ticket.location.coordinates[0]]
-        : [51.7535, 19.4520];
+    const position=getCoordinates(ticket.location)
     const hasAuditLog = ticket.audit_log && ticket.audit_log.length > 0;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
@@ -179,6 +195,19 @@ const TicketModal = ({ticket, onClose}) => {
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
+                    {/* --- Duplicate info --- */}
+                    {ticket.parent_ticket && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                            <span className="material-symbols-outlined text-amber-600 mt-0.5">link</span>
+                            <div>
+                                <h5 className="font-bold text-amber-800 text-sm">Zgłoszenie połączone (Duplikat)</h5>
+                                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                                    To zgłoszenie zostało oznaczone jako duplikat i podpięte pod zgłoszenie główne
+                                    <strong className="ml-1 text-amber-950 font-extrabold">#REP-{ticket.parent_ticket}</strong>.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     {/* Status and Priority */}
                     <div className="flex flex-wrap gap-3">
                         <StatusBadge status={mapStatusToBadge(ticket.status)}/>
