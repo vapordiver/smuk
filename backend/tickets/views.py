@@ -5,15 +5,15 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db import transaction
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
-from .models import Building, FaultCategory, Ticket, Campus, AuditLog
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, \
-    TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, NearbyTicketSerializer
+from .models import Building, FaultCategory, Ticket, Campus, AuditLog, WeeklyReport
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, WeeklyReportSerializer, NearbyTicketSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
+from .throttles import TicketCreateThrottle
 from django.contrib.gis.geos import Polygon, Point
 from django.contrib.gis.db.models.functions import SnapToGrid, Distance
+from django.db import transaction
 from django.contrib.gis.measure import D
 from django.db.models import Count
 from .tasks import calculate_priority
@@ -81,12 +81,19 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
     `GET /api/tickets/`      (list)
     `GET /api/tickets/<id>/` (retrieve)
     `GET /api/tickets/my/`   (get_my_tickets)
-    `POST /api/tickets/`     (create)
+    `POST /api/tickets/`     (create)  → throttle: at 11th ticket in 5 mins response with "Too many requests. Please try again later." with 429 
     """
     filter_backends = [DjangoFilterBackend, OrderingFilter, filters.SearchFilter]
     filterset_class = TicketFilter
     ordering_fields = ['created_at', 'priority', 'status']
     search_fields = ['title', 'description', 'id']
+
+    def get_throttles(self):
+        """Apply rate limiting only on ticket creation (POST)."""
+        if self.action == 'create':
+            return [TicketCreateThrottle()]
+        return []
+
 
     def handle_exception(self, exc):
         response = super().handle_exception(exc)
@@ -530,3 +537,13 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             "child_ticket_id": child_ticket.id,
             "verification_status": "CONFIRMED_MANUALLY"
         }, status=status.HTTP_201_CREATED)
+
+class WeeklyReportListView(generics.ListAPIView):
+    """
+    GET /api/reports/weekly/
+    Read-only endpoint for the coordinator dashboard.
+    Returns all weekly reports ordered by newest first.
+    """
+    queryset = WeeklyReport.objects.all()
+    serializer_class = WeeklyReportSerializer
+    permission_classes = [IsAuthenticated, IsInCoordinatorGroup]

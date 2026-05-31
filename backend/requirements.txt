@@ -10,6 +10,7 @@ psycopg[binary]==3.3.3
 
 # Celery + Redis
 celery[redis]==5.6.2
+django-redis==5.4.0
 
 # Serwer WSGI
 gunicorn==25.3.0
@@ -21,3 +22,6 @@ django-storages==1.14.6
 
 # Konfiguracja
 django-environ==0.13.0
+
+# HTTP
+requests>=2.31,<3

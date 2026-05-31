@@ -39,6 +39,7 @@ export default function ReportForm() {
 
   /* ── Form state ── */
   const [errors, setErrors] = useState({});
+  const [submitted, setSubmitted] = useState(false);
 
 
   const [isMobile, setIsMobile] = useState(true);
@@ -140,6 +141,8 @@ export default function ReportForm() {
       formData.append('longitude', location.lng);
 
       await submitTicket(formData);
+
+      setSubmitted(true);
       showToast('success', 'Zgłoszenie zostało wysłane! Przekierowuję…');
       setTimeout(() => navigate('/my-tickets'), 2000);
     } catch (err) {
@@ -409,7 +412,7 @@ export default function ReportForm() {
           <div className="pt-4">
             <button
               type="submit"
-              disabled={submitting || loadingData || isPrechecking}
+              disabled={submitting || submitted || loadingData || isPrechecking}
               className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold text-base shadow-lg shadow-primary/20
                 hover:shadow-xl hover:shadow-primary/30 hover:scale-[0.98] active:scale-95
                 transition-all duration-200 cursor-pointer
@@ -420,6 +423,11 @@ export default function ReportForm() {
                 <>
                   <span className="material-symbols-outlined text-xl animate-spin">progress_activity</span>
                   Przetwarzanie…
+                </>
+              ) : submitted ? (
+                <>
+                  <span className="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+                  Przekierowuję…
                 </>
               ) : (
                 <>

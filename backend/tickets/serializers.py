@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Building, FaultCategory, Ticket, AuditLog, Campus
+from .models import Building, FaultCategory, Ticket, AuditLog, Campus, WeeklyReport
 from users.serializers import UserShortSerializer
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
@@ -290,3 +290,16 @@ class NearbyTicketSerializer(serializers.ModelSerializer):
                 dist_in_meters = obj.distance * 111320
             return round(dist_in_meters, 2)
         return None
+class WeeklyReportSerializer(serializers.ModelSerializer):
+    week_start = serializers.SerializerMethodField()
+    week_end = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WeeklyReport
+        fields = ["id", "week_start", "week_end", "content", "raw_stats", "created_at"]
+
+    def get_week_start(self, obj):
+        return obj.week_start.date().isoformat()
+
+    def get_week_end(self, obj):
+        return obj.week_end.date().isoformat()
