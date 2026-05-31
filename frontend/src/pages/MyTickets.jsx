@@ -164,8 +164,7 @@ const TicketCard = ({ticket, onClick}) => {
                         </span>
                     </div>
                 </div>
-
-                {/* Dolny pasek przypięty absolutnie na stałe do spodu z bezpiecznym odstępem */}
+                {/* bottom panel with status and detailed look button*/}
                 <div className="absolute bottom-5 left-5 right-5 md:bottom-6 md:left-6 md:right-6 flex items-center justify-between pt-3 md:pt-4 border-t border-slate-100 shrink-0">
                     <div className="flex items-center gap-2 shrink-0">
                         <StatusBadge status={mapStatusToBadge(ticket.status)}/>

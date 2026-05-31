@@ -69,23 +69,26 @@ class Command(BaseCommand):
 
             title = random.choice(possible_titles)
 
+            selected_building = random.choice(buildings)
+
             ticket = Ticket.objects.create(
                 title=title,
                 description=self.DESCRIPTIONS.get(
                     title,
                     "Wymagana interwencja techniczna."
                 ),
-                building=random.choice(buildings),
+                building=selected_building,
                 category=category,
                 reporter=reporter,
                 assigned_to=reporter,
-                location=random.choice(buildings).centroid,
-                priority=random.choice([
-                    Ticket.Priority.LOW,
-                    Ticket.Priority.MEDIUM,
-                    Ticket.Priority.HIGH,
-                    Ticket.Priority.CRITICAL,
-                ]),
+                location=selected_building.centroid,
+                #priority=random.choice([
+                #    Ticket.Priority.LOW,
+                #    Ticket.Priority.MEDIUM,
+                #    Ticket.Priority.HIGH,
+                #    Ticket.Priority.CRITICAL,
+                #]),
+                priority=Ticket.Priority.LOW,
                 status=random.choice([
                     Ticket.Status.NEW,
                     Ticket.Status.IN_PROGRESS,
