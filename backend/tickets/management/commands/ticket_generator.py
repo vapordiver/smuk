@@ -95,9 +95,9 @@ class Command(BaseCommand):
 
             created += 1
 
-            self.stdout.write(
-                #f"[{created}/100] Ticket #{ticket.id}: {ticket.title}"
-            )
+            #self.stdout.write(
+            #    f"[{created}/100] Ticket #{ticket.id}: {ticket.title}"
+            #)
 
         self.stdout.write(
             self.style.SUCCESS(

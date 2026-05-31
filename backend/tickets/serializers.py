@@ -252,3 +252,19 @@ class TicketUpdateSerializer(serializers.ModelSerializer):
             if not User.objects.filter(pk=value).exists():
                 raise serializers.ValidationError("User with this ID does not exist.")
         return value
+
+class NearbyTicketSerializer(serializers.ModelSerializer):
+    """
+    Serializer used to get nearby tickets, used for checking duplicate reports.
+    """
+    category = FaultCategorySerializer(read_only=True)
+    distance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Ticket
+        fields = ["id", "title", "status", "category", "distance", "created_at"]
+
+    def get_distance(self, obj):
+        if hasattr(obj, "distance") and obj.distance is not None:
+            return round(obj.distance, 2)
+        return None
