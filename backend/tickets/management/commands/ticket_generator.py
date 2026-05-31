@@ -45,7 +45,7 @@ class Command(BaseCommand):
 
         if not reporter:
             raise CommandError(
-                "Nie znaleziono użytkownika coord1@p.lodz.pl"
+                "Nie znaleziono użytkownika reporter1@p.lodz.pl"
             )
 
         buildings = list(Building.objects.all())
