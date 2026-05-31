@@ -290,6 +290,8 @@ class NearbyTicketSerializer(serializers.ModelSerializer):
                 dist_in_meters = obj.distance * 111320
             return round(dist_in_meters, 2)
         return None
+
+
 class WeeklyReportSerializer(serializers.ModelSerializer):
     week_start = serializers.SerializerMethodField()
     week_end = serializers.SerializerMethodField()
