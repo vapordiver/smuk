@@ -1,12 +1,16 @@
 import logging
+import time
+import requests
 from io import BytesIO
 from celery import shared_task
 from datetime import timedelta
 from django.contrib.gis.measure import D
 from django.core.files.base import ContentFile
 from django.utils import timezone
+from django.db.models import Count
+from django.conf import settings
 from PIL import Image
-from .models import Ticket, AuditLog
+from .models import Ticket, AuditLog, WeeklyReport
 
 logger = logging.getLogger(__name__)
 
@@ -174,3 +178,162 @@ def archive_old_tickets():
             continue
 
     logger.info("archive_old_tickets: archived %s tickets", processed)
+
+
+@shared_task
+def generate_weekly_report():
+    """
+    Aggregates ticket data from the last 7 days and generates an AI summary
+    via Hugging Face API. Falls back to raw_stats only on any failure.
+    """
+    now = timezone.now()
+    week_start = now - timedelta(days=7)
+    week_end = now
+
+    # --- 1. Aggregate stats ---
+    created_count = Ticket.objects.filter(
+        created_at__gte=week_start,
+        created_at__lte=week_end,
+    ).count()
+
+    resolved_count = Ticket.objects.filter(
+        updated_at__gte=week_start,
+        updated_at__lte=week_end,
+        status__in=[Ticket.Status.RESOLVED, Ticket.Status.CLOSED],
+    ).count()
+
+    pending_count = Ticket.objects.exclude(
+        status__in=[Ticket.Status.RESOLVED, Ticket.Status.CLOSED, Ticket.Status.ARCHIVED],
+    ).count()
+
+    top_category_row = (
+        Ticket.objects.filter(
+            created_at__gte=week_start,
+            created_at__lte=week_end,
+            category__isnull=False,
+        )
+        .values("category__id", "category__name")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+        .first()
+    )
+
+    top_building_row = (
+        Ticket.objects.filter(
+            created_at__gte=week_start,
+            created_at__lte=week_end,
+            building__isnull=False,
+        )
+        .values("building__id", "building__name")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+        .first()
+    )
+
+    raw_stats = {
+        "total_created": created_count,
+        "total_resolved": resolved_count,
+        "total_open": pending_count,
+        "top_category": {
+            "id": top_category_row["category__id"],
+            "name": top_category_row["category__name"],
+            "count": top_category_row["count"],
+        } if top_category_row else None,
+        "top_building": {
+            "id": top_building_row["building__id"],
+            "name": top_building_row["building__name"],
+            "count": top_building_row["count"],
+        } if top_building_row else None,
+    }
+
+    # --- 2. Call Hugging Face API ---
+    content = None
+    api_key = getattr(settings, "HUGGINGFACE_API_KEY", None)
+
+    if api_key:
+        hf_url = "https://router.huggingface.co/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        top_cat_name = top_category_row["category__name"] if top_category_row else "N/A"
+        top_bld_name = top_building_row["building__name"] if top_building_row else "N/A"
+
+        prompt = (
+            f"You are an assistant that writes concise weekly reports for a campus fault-reporting system. "
+            f"Here are the stats for the past 7 days:\n"
+            f"- New tickets created: {created_count}\n"
+            f"- Resolved/closed tickets: {resolved_count}\n"
+            f"- Currently pending tickets: {pending_count}\n"
+            f"- Top category: {top_cat_name}\n"
+            f"- Top building: {top_bld_name}\n\n"
+            f"Write a short, professional weekly summary report in Polish."
+            f"CRITICAL RULES:\n"
+            f"1. Do NOT write a letter. Write a direct executive summary.\n"
+            f"2. Do NOT include any greetings or salutations (e.g., 'Szanowni Państwo').\n"
+            f"3. Do NOT include any sign-offs or farewells (e.g., 'Z poważaniem', 'Sincerely', 'Pozdrawiam').\n"
+            f"4. Do NOT include any signature blocks, names, dates, or bracketed placeholders like '[Twoje imię i nazwisko]'. "
+            f"End the report with a meaningful conclusion based solely on the data."
+        )
+
+        payload = {
+            "model" : "Qwen/Qwen2.5-7B-Instruct",
+            "messages" : [{"role": "user", "content" : prompt}],
+            "max_tokens": 250,
+            "temperature" : 0.3,
+        }
+
+        for attempt in range(3):
+            try:
+                response = requests.post(
+                    hf_url, headers=headers, json=payload, timeout=60
+                )
+
+                if response.status_code == 503:
+                    logger.warning(
+                        "generate_weekly_report: HF API returned 503 (model loading), "
+                        "retrying in 30s (attempt %d/3)", attempt + 1,
+                    )
+                    time.sleep(30)
+                    continue
+
+                response.raise_for_status()
+                result = response.json()
+
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0]["message"].get("content", "")
+                else:
+                    logger.warning(
+                        "generate_weekly_report: unexpected HF API response format: %s",
+                        result,
+                    )
+                break
+
+            except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
+                logger.exception(
+                    "generate_weekly_report: HF API request failed (attempt %d/3): %s",
+                    attempt + 1, exc,
+                )
+                if attempt < 2:
+                    time.sleep(30)
+                continue
+    else:
+        logger.info(
+            "generate_weekly_report: HUGGINGFACE_API_KEY not set, skipping AI generation."
+        )
+
+    # --- 3. Save report (always succeeds) ---
+    report = WeeklyReport.objects.create(
+        week_start=week_start,
+        week_end=week_end,
+        content=content,
+        raw_stats=raw_stats,
+    )
+
+    logger.info(
+        "generate_weekly_report: created report id=%s, content=%s",
+        report.id,
+        "generated" if content else "fallback (raw_stats only)",
+    )
+    return report.id

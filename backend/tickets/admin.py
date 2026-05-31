@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.gis.admin import GISModelAdmin
-from .models import Ticket, Building, FaultCategory, AuditLog, Campus
+from .models import Ticket, Building, FaultCategory, AuditLog, Campus, WeeklyReport
 
 # Custom admin display for 'tickets' app models.
 
@@ -104,3 +104,11 @@ class AuditLogAdmin(admin.ModelAdmin):
         return False
 
     # """
+
+@admin.register(WeeklyReport)
+class WeeklyReportAdmin(admin.ModelAdmin):
+    list_display = ("id", "week_start", "week_end", "created_at")
+    readonly_fields = ("id", "week_start", "week_end", "content", "raw_stats", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("content",)
+

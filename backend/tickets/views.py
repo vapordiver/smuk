@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
-from .models import Building, FaultCategory, Ticket, Campus, AuditLog
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer
+from .models import Building, FaultCategory, Ticket, Campus, AuditLog, WeeklyReport
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, WeeklyReportSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
 from django.contrib.gis.geos import Polygon
@@ -358,3 +358,14 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
         output_serializer = TicketDetailSerializer(ticket)
         return Response(output_serializer.data)
+
+
+class WeeklyReportListView(generics.ListAPIView):
+    """
+    GET /api/reports/weekly/
+    Read-only endpoint for the coordinator dashboard.
+    Returns all weekly reports ordered by newest first.
+    """
+    queryset = WeeklyReport.objects.all()
+    serializer_class = WeeklyReportSerializer
+    permission_classes = [IsAuthenticated, IsInCoordinatorGroup]

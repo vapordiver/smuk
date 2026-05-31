@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Building, FaultCategory, Ticket, AuditLog, Campus
+from .models import Building, FaultCategory, Ticket, AuditLog, Campus, WeeklyReport
 from users.serializers import UserShortSerializer
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
@@ -252,3 +252,18 @@ class TicketUpdateSerializer(serializers.ModelSerializer):
             if not User.objects.filter(pk=value).exists():
                 raise serializers.ValidationError("User with this ID does not exist.")
         return value
+
+
+class WeeklyReportSerializer(serializers.ModelSerializer):
+    week_start = serializers.SerializerMethodField()
+    week_end = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WeeklyReport
+        fields = ["id", "week_start", "week_end", "content", "raw_stats", "created_at"]
+
+    def get_week_start(self, obj):
+        return obj.week_start.date().isoformat()
+
+    def get_week_end(self, obj):
+        return obj.week_end.date().isoformat()
