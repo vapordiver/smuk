@@ -8,7 +8,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
 from .models import Building, FaultCategory, Ticket, Campus, AuditLog
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, NearbyTicketSerializer
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, \
+    TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, NearbyTicketSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
 from django.contrib.gis.geos import Polygon, Point
@@ -73,7 +74,8 @@ class FaultCategoriesListView(generics.ListAPIView):
     pagination_class = None
 
 
-class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
+class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.UpdateModelMixin,
+                    viewsets.GenericViewSet):
     """
     `ticket` ViewSet for:
     `GET /api/tickets/`      (list)
@@ -357,23 +359,59 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 new_value=serializer.validated_data['note']
             )
 
+        # changes to pinned subtickets
+        new_status = serializer.validated_data.get('status')
+        new_priority = serializer.validated_data.get('priority')
+        if (new_status and new_status != old_status) or (new_priority and new_priority != old_priority):
+            subtickets = Ticket.objects.filter(parent_ticket=ticket)
+            for subticket in subtickets:
+                old_subticket_status = subticket.status
+                old_subticket_priority = subticket.priority
+                update_fields = ['updated_at']
+
+                if new_status and new_status != old_status:
+                    subticket.status = new_status
+                    update_fields.append('status')
+                    AuditLog.objects.create(
+                        ticket=subticket,
+                        user=request.user,
+                        field_changed='status',
+                        old_value=old_subticket_status,
+                        new_value=new_status
+                    )
+
+                if new_priority and new_priority != old_priority:
+                    subticket.priority = new_priority
+                    update_fields.append('priority')
+                    AuditLog.objects.create(
+                        ticket=subticket,
+                        user=request.user,
+                        field_changed='priority',
+                        old_value=old_subticket_priority,
+                        new_value=new_priority
+                    )
+
+                # saving updated subticket
+                subticket.save(update_fields=update_fields)
+
         output_serializer = TicketDetailSerializer(ticket)
         return Response(output_serializer.data)
 
     @action(detail=False, methods=['get'], url_path='nearby', permission_classes=[IsAuthenticated])
     def nearby(self, request):
         """
-        GET /api/tickets/nearby/?lat=X&lng=Y&category_id=Z&radius=50
-        searches for similar and OPEN tickets in the radius
+        GET /api/tickets/nearby/?lat=X&lng=Y&category_id=Z&radius=50&building_id=B
+        searches for similar and OPEN tickets in the radius, parent must be in same building as presumed subticket
         """
         lat = request.query_params.get('lat')
         lng = request.query_params.get('lng')
         category_id = request.query_params.get('category_id')
         radius = request.query_params.get('radius', 50)
+        building_id = request.query_params.get('building_id')
 
         if not lat or not lng or not category_id:
             return Response(
-                {"error": {"code": "VALIDATION_ERROR", "message": "Missing lat, lng, or category_id."}},
+                {"error": {"code": "VALIDATION_ERROR", "message": "Missing lat, lng or category_id."}},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -382,6 +420,8 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             lng = float(lng)
             category_id = int(category_id)
             radius = float(radius)
+            if building_id:
+                building_id = int(building_id)
         except ValueError:
             return Response(
                 {"error": {"code": "VALIDATION_ERROR", "message": "Invalid parameter types."}},
@@ -390,13 +430,22 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
         point = Point(lng, lat, srid=4326)
 
-        # ONLY OPEN TICKETS AND NOT SUBTICKETS
-        queryset = self.get_queryset().filter(
-            category_id=category_id,
-            status__in=['NEW', 'IN_PROGRESS', 'NEEDS_REVIEW'],
-            parent_ticket__isnull=True,
-            location__distance_lte=(point, D(m=radius))
-        ).annotate(
+        #basic filter
+        filter_kwargs = {
+            'category_id': category_id,
+            'status__in': ['NEW', 'IN_PROGRESS', 'NEEDS_REVIEW'],
+            'parent_ticket__isnull': True,
+            'location__distance_lte': (point, D(m=radius))
+        }
+
+        #subticket in the same building or outside buildings
+        if building_id:
+            filter_kwargs['building_id'] = building_id
+        else:
+            filter_kwargs['building__isnull'] = True
+
+        # ONLY OPEN TICKETS AND NOT SUBTICKETS, FILTERED BY SAME BUILDINGS
+        queryset = self.get_queryset().filter(**filter_kwargs).annotate(
             distance=Distance('location', point)
         ).order_by('distance')
 
@@ -434,22 +483,38 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            lat = float(new_ticket_data.get('latitude'))
-            lng = float(new_ticket_data.get('longitude'))
-            point = Point(lng, lat, srid=4326)
-        except(TypeError, ValueError):
+        # subticket validation
+        serializer = TicketCreateSerializer(data=new_ticket_data)
+        # image not needed in duplicate
+        serializer.fields['image'].required = False
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        # additional category check with parent ticket
+        if validated_data['category_id'] != parent_ticket.category_id:
             return Response(
-                {"error": {"code": "VALIDATION_ERROR", "message": "Invalid coordinates."}},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+                {"error": {"code": "VALIDATION_ERROR",
+                           "message": "Subticket category is different from parent ticket category."}},
+                status=status.HTTP_400_BAD_REQUEST)
+
+        # additional distance check to parent ticket
+        point = validated_data['_point']
+        if parent_ticket.location:
+            is_close_to_parent = Ticket.objects.filter(
+                pk=parent_ticket.pk,
+                location__distance_lte=(point, D(m=50))
+            ).exists()
+            if not is_close_to_parent:
+                return Response(
+                    {"error": {"code": "VALIDATION_ERROR",
+                               "message": "Location of the ticket is too great to be pinned as a subticket."}},
+                    status=status.HTTP_400_BAD_REQUEST)
 
         # pinning the ticket without the img, cosiek add AI here my compadre
         with transaction.atomic():
             child_ticket = Ticket.objects.create(
-                title=new_ticket_data.get('title', parent_ticket.title),
-                description=new_ticket_data.get('description', ''),
-                category_id=new_ticket_data.get('category_id', parent_ticket.category_id),
+                title=validated_data.get('title',parent_ticket.title),
+                description=validated_data['description'],
+                category_id=validated_data['category_id'],
                 location=point,
                 building=parent_ticket.building,
                 priority=parent_ticket.priority,
@@ -458,6 +523,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 status=parent_ticket.status
             )
 
+        # change needed here after addition of AI check
         return Response({
             "message": "Successfully pinned this ticket as a subticket.",
             "parent_ticket_id": parent_ticket.id,

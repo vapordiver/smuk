@@ -107,7 +107,8 @@ export default function ReportForm() {
           lat: location.lat,
           lng: location.lng,
           category_id: categoryId,
-          radius: 50 // promien w metrach
+          radius: 50, // promien w metrach
+          building_id: buildingId || ''
         }
       });
       if (res.data.results && res.data.results.length > 0) {

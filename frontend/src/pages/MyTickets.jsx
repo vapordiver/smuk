@@ -125,8 +125,9 @@ const TicketCard = ({ticket, onClick}) => {
     const displayImage = ticket.image || ticket.parent_details?.image;
     return (
         <div
-            className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row md:h-52 h-full cursor-pointer"
+            className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row md:h-52 h-full cursor-pointer relative"
             onClick={() => onClick(ticket)}>
+
             {/* image section */}
             <div className="md:w-1/3 relative h-48 md:h-full overflow-hidden bg-slate-100 shrink-0">
                 {displayImage ? (
@@ -137,29 +138,36 @@ const TicketCard = ({ticket, onClick}) => {
                     />
                 ) : (
                     <div
-                        className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">Brak
-                        zdjęcia</div>
+                        className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                        Brak zdjęcia
+                    </div>
                 )}
             </div>
+
             {/* ticket main body section */}
-            <div className="md:w-2/3 p-6 flex flex-col justify-between min-w-0">
-                <div>
-                    <div className="flex justify-between items-start mb-2">
-                        <span
-                            className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">ID: #REP-{ticket.id}</span>
-                        <span className="text-xs text-slate-500 font-medium">{formatDate(ticket.created_at)}</span>
+            <div className="md:w-2/3 p-5 md:p-6 pb-20 md:pb-16 flex flex-col min-w-0 w-full relative">
+                <div className="flex flex-col">
+                    <div className="flex justify-between items-start mb-1">
+                        <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase shrink-0">ID: #REP-{ticket.id}</span>
+                        <span className="text-xs text-slate-500 font-medium shrink-0 ml-2">{formatDate(ticket.created_at)}</span>
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-primary transition-colors">{ticket.title}</h3>
-                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-4">
-                        <span className="material-symbols-outlined text-lg">location_on</span>
-                        <span>
+
+                    <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-primary transition-colors line-clamp-2"
+                        title={ticket.title}>
+                        {ticket.title}
+                    </h3>
+
+                    <div className="flex items-center gap-1 text-slate-500 text-sm">
+                        <span className="material-symbols-outlined text-lg shrink-0">location_on</span>
+                        <span className="line-clamp-1" title={ticket.building?.name}>
                             {ticket.building?.name || "Teren kampusu"}
                         </span>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                    <div className="flex items-center gap-2">
+                {/* Dolny pasek przypięty absolutnie na stałe do spodu z bezpiecznym odstępem */}
+                <div className="absolute bottom-5 left-5 right-5 md:bottom-6 md:left-6 md:right-6 flex items-center justify-between pt-3 md:pt-4 border-t border-slate-100 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                         <StatusBadge status={mapStatusToBadge(ticket.status)}/>
                     </div>
                     <button
@@ -167,6 +175,7 @@ const TicketCard = ({ticket, onClick}) => {
                         Zobacz szczegóły <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     </button>
                 </div>
+
             </div>
         </div>
     );

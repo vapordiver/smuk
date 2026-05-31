@@ -963,6 +963,11 @@ paths:
             type: integer
             default: 50
             description: Promień w metrach
+        - name: building_id
+          in: query
+          required: false
+          schema:
+           type: integer
       responses:
         "200":
           description: Lista podobnych zgłoszeń
