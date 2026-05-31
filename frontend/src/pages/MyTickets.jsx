@@ -125,10 +125,10 @@ const TicketCard = ({ticket, onClick}) => {
     const displayImage = ticket.image || ticket.parent_details?.image;
     return (
         <div
-            className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row h-full cursor-pointer"
+            className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row md:h-52 h-full cursor-pointer"
             onClick={() => onClick(ticket)}>
             {/* image section */}
-            <div className="md:w-1/3 relative h-48 md:h-auto overflow-hidden bg-slate-100">
+            <div className="md:w-1/3 relative h-48 md:h-full overflow-hidden bg-slate-100 shrink-0">
                 {displayImage ? (
                     <img
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
@@ -142,7 +142,7 @@ const TicketCard = ({ticket, onClick}) => {
                 )}
             </div>
             {/* ticket main body section */}
-            <div className="md:w-2/3 p-6 flex flex-col justify-between">
+            <div className="md:w-2/3 p-6 flex flex-col justify-between min-w-0">
                 <div>
                     <div className="flex justify-between items-start mb-2">
                         <span
@@ -206,8 +206,13 @@ const TicketModal = ({ticket, onClose}) => {
                                         (Duplikat)</h5>
                                     <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
                                         To zgłoszenie zostało oznaczone jako duplikat i podpięte pod zgłoszenie główne
-                                        <strong
-                                            className="ml-1 text-amber-950 font-extrabold">#REP-{ticket.parent_details.id}</strong>.
+                                        <strong className="ml-1 text-amber-950 font-extrabold">
+                                            #REP-{ticket.parent_details.id}
+                                        </strong>.<br/>
+                                        Zdjęcie dodane do tego zgłoszenia zostało zastąpione zdjęciem pochodzącym ze
+                                        zgłoszenia nadrzędnego.
+                                        Jeśli uważasz, że zgłoszenie zostało nieprawidłowo zidentyfikowane jako duplikat
+                                        lub występują inne problemy, skontaktuj się z administratorem lub koordynatorem.
                                     </p>
                                 </div>
                             </div>
@@ -261,7 +266,7 @@ const TicketModal = ({ticket, onClose}) => {
                                 {ticket.image ? "Zdjęcie usterki" : "Zdjęcie ze zgłoszenia głównego"}
                             </h4>
                             <img
-                                className="w-full h-full object-cover rounded-2xl max-h-96 border border-slate-200"
+                                className="w-full h-auto rounded-2xl border border-slate-200"
                                 src={getImageUrl(ticket.image || ticket.parent_details.image)}
                                 alt={ticket.title}
                             />
