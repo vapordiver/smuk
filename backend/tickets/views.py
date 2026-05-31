@@ -515,7 +515,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 title=validated_data.get('title',parent_ticket.title),
                 description=validated_data['description'],
                 category_id=validated_data['category_id'],
-                location=point,
+                location=parent_ticket.location,
                 building=parent_ticket.building,
                 priority=parent_ticket.priority,
                 reporter=request.user,
