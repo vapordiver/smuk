@@ -269,6 +269,12 @@ def generate_weekly_report():
             f"- Top category: {top_cat_name}\n"
             f"- Top building: {top_bld_name}\n\n"
             f"Write a short, professional weekly summary report in Polish."
+            f"CRITICAL RULES:\n"
+            f"1. Do NOT write a letter. Write a direct executive summary.\n"
+            f"2. Do NOT include any greetings or salutations (e.g., 'Szanowni Państwo').\n"
+            f"3. Do NOT include any sign-offs or farewells (e.g., 'Z poważaniem', 'Sincerely', 'Pozdrawiam').\n"
+            f"4. Do NOT include any signature blocks, names, dates, or bracketed placeholders like '[Twoje imię i nazwisko]'. "
+            f"End the report with a meaningful conclusion based solely on the data."
         )
 
         payload = {
