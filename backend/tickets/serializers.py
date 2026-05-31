@@ -52,7 +52,7 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
     (`AuditLogEntry` in API contract)
     """
     user = UserShortSerializer(read_only=True)
-    
+
     class Meta:
         model = AuditLog
         fields = [
@@ -121,10 +121,10 @@ class TicketDetailSerializer(serializers.ModelSerializer):
         model = Ticket
         fields = [
             "id", "title", "description", "category", "building",
-            "floor", "room", "status", "priority", "location", "image", 
-            "reporter", "assigned_to", "parent_ticket", "created_at", 
-            "updated_at", 
-            "audit_log" 
+            "floor", "room", "status", "priority", "location", "image",
+            "reporter", "assigned_to", "parent_ticket", "created_at",
+            "updated_at",
+            "audit_log"
         ]
 
     def get_location(self, obj):
@@ -160,11 +160,11 @@ class TicketCreateSerializer(serializers.Serializer):
         """
         if value.size > 10 * 1024 * 1024: # 10MB
             raise serializers.ValidationError("Image file too large (max 10MB).")
-        
+
         allowed_types = ['image/jpeg', 'image/png']
         if value.content_type not in allowed_types:
             raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
-        
+
         return value
 
     def validate_category_id(self, value):
@@ -198,15 +198,15 @@ class TicketCreateSerializer(serializers.Serializer):
             return attrs
 
         point = Point(lng, lat, srid=4326)
-        
+
         # geofencing: check if location is within campus boundaries
         is_on_campus = Campus.objects.filter(polygon__contains=point).exists()
-        
+
         if not is_on_campus:
             raise serializers.ValidationError({
                 "location": "Location is outside campus boundaries."
             })
-        
+
         # if building is provided, check proximity (max 300m)
         building_id = attrs.get("building_id")
         if building_id:
@@ -214,7 +214,7 @@ class TicketCreateSerializer(serializers.Serializer):
                 building = Building.objects.get(pk=building_id)
                 if building.polygon:
                     is_close = Building.objects.filter(
-                        pk=building_id, 
+                        pk=building_id,
                         polygon__distance_lte=(point, D(m=300))
                     ).exists()
                 else:
@@ -222,14 +222,14 @@ class TicketCreateSerializer(serializers.Serializer):
                         pk=building_id,
                         centroid__distance_lte=(point, D(m=300))
                     ).exists()
-                    
+
                 if not is_close:
                     raise serializers.ValidationError({
                         "location": "Location is too far from selected building (max 300m)."
                     })
             except Building.DoesNotExist:
                 pass
-                
+
         attrs["_point"] = point
 
         return attrs
@@ -262,7 +262,7 @@ class NearbyTicketSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ticket
-        fields = ["id", "title", "status", "category", "distance", "created_at"]
+        fields = ["id", "title", "description", "image", "status", "category", "distance", "created_at"]
 
     def get_distance(self, obj):
         if hasattr(obj, "distance") and obj.distance is not None:

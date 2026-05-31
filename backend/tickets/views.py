@@ -401,7 +401,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             distance=Distance('location', point)
         ).order_by('distance')
 
-        serializer = NearbyTicketSerializer(queryset, many=True)
+        serializer = NearbyTicketSerializer(queryset, many=True, context={'request': request})
 
         return Response({
             "count": queryset.count(),
