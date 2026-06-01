@@ -26,6 +26,7 @@ class BuildingSerializer(serializers.ModelSerializer):
             }
         return None
 
+
 class CampusSerializer(serializers.ModelSerializer):
     polygon = serializers.SerializerMethodField()
 
@@ -52,7 +53,7 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
     (`AuditLogEntry` in API contract)
     """
     user = UserShortSerializer(read_only=True)
-    
+
     class Meta:
         model = AuditLog
         fields = [
@@ -87,6 +88,16 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
         return data
 
 
+class ParentTicketShortSerializer(serializers.ModelSerializer):
+    """
+    Mini-serializer to fetch basic details of the parent ticket
+    """
+
+    class Meta:
+        model = Ticket
+        fields = ["id", "status", "image", "title"]
+
+
 class TicketListSerializer(serializers.ModelSerializer):
     """
     (`TicketListItem` in API contract)
@@ -96,12 +107,14 @@ class TicketListSerializer(serializers.ModelSerializer):
     reporter = UserShortSerializer(read_only=True)
     assigned_to = UserShortSerializer(read_only=True)
     audit_log = AuditLogEntrySerializer(source="audit_logs", many=True, read_only=True)
+    parent_details = ParentTicketShortSerializer(source="parent_ticket", read_only=True)
 
     class Meta:
         model = Ticket
         fields = [
             "id", "title", "description", "status", "priority", "category",
-            "building", "floor", "room", "reporter", "assigned_to", "location", "image", "created_at", "audit_log"
+            "building", "floor", "room", "reporter", "assigned_to", "location", "image", "created_at", "audit_log",
+            "parent_ticket", "parent_details"
         ]
 
 
@@ -116,15 +129,16 @@ class TicketDetailSerializer(serializers.ModelSerializer):
     location = serializers.SerializerMethodField()
     reporter = UserShortSerializer(read_only=True)
     assigned_to = UserShortSerializer(read_only=True)
+    parent_details = ParentTicketShortSerializer(source="parent_ticket", read_only=True)
 
     class Meta:
         model = Ticket
         fields = [
             "id", "title", "description", "category", "building",
-            "floor", "room", "status", "priority", "location", "image", 
-            "reporter", "assigned_to", "parent_ticket", "created_at", 
-            "updated_at", 
-            "audit_log" 
+            "floor", "room", "status", "priority", "location", "image",
+            "reporter", "assigned_to", "parent_ticket", "parent_details", "created_at",
+            "updated_at",
+            "audit_log"
         ]
 
     def get_location(self, obj):
@@ -139,6 +153,7 @@ class TicketDetailSerializer(serializers.ModelSerializer):
             }
         return None
 
+
 class TicketCreateSerializer(serializers.Serializer):
     """
     Serializer used when creating a new ticket (POST /api/tickets/).
@@ -148,8 +163,8 @@ class TicketCreateSerializer(serializers.Serializer):
     description = serializers.CharField(min_length=10)
     category_id = serializers.IntegerField()
     building_id = serializers.IntegerField(required=False)
-    #floor = serializers.IntegerField(required=False)
-    #room = serializers.CharField(required=False)
+    # floor = serializers.IntegerField(required=False)
+    # room = serializers.CharField(required=False)
     latitude = serializers.FloatField(min_value=-90, max_value=90)
     longitude = serializers.FloatField(min_value=-180, max_value=180)
     image = serializers.ImageField()
@@ -158,13 +173,13 @@ class TicketCreateSerializer(serializers.Serializer):
         """
         Validate image size (max 10MB) and file type (JPEG/PNG only).
         """
-        if value.size > 10 * 1024 * 1024: # 10MB
+        if value.size > 10 * 1024 * 1024:  # 10MB
             raise serializers.ValidationError("Image file too large (max 10MB).")
-        
+
         allowed_types = ['image/jpeg', 'image/png']
         if value.content_type not in allowed_types:
             raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
-        
+
         return value
 
     def validate_category_id(self, value):
@@ -198,15 +213,15 @@ class TicketCreateSerializer(serializers.Serializer):
             return attrs
 
         point = Point(lng, lat, srid=4326)
-        
+
         # geofencing: check if location is within campus boundaries
         is_on_campus = Campus.objects.filter(polygon__contains=point).exists()
-        
+
         if not is_on_campus:
             raise serializers.ValidationError({
                 "location": "Location is outside campus boundaries."
             })
-        
+
         # if building is provided, check proximity (max 300m)
         building_id = attrs.get("building_id")
         if building_id:
@@ -214,7 +229,7 @@ class TicketCreateSerializer(serializers.Serializer):
                 building = Building.objects.get(pk=building_id)
                 if building.polygon:
                     is_close = Building.objects.filter(
-                        pk=building_id, 
+                        pk=building_id,
                         polygon__distance_lte=(point, D(m=300))
                     ).exists()
                 else:
@@ -222,17 +237,18 @@ class TicketCreateSerializer(serializers.Serializer):
                         pk=building_id,
                         centroid__distance_lte=(point, D(m=300))
                     ).exists()
-                    
+
                 if not is_close:
                     raise serializers.ValidationError({
                         "location": "Location is too far from selected building (max 300m)."
                     })
             except Building.DoesNotExist:
                 pass
-                
+
         attrs["_point"] = point
 
         return attrs
+
 
 class TicketUpdateSerializer(serializers.ModelSerializer):
     """
@@ -252,6 +268,28 @@ class TicketUpdateSerializer(serializers.ModelSerializer):
             if not User.objects.filter(pk=value).exists():
                 raise serializers.ValidationError("User with this ID does not exist.")
         return value
+
+
+class NearbyTicketSerializer(serializers.ModelSerializer):
+    """
+    Serializer used to get nearby tickets, used for checking duplicate reports.
+    """
+    category = FaultCategorySerializer(read_only=True)
+    distance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Ticket
+        fields = ["id", "title", "description", "image", "status", "category", "distance", "created_at"]
+
+    def get_distance(self, obj):
+        if hasattr(obj, "distance") and obj.distance is not None:
+            try:
+                dist_in_meters = obj.distance.m
+            except AttributeError:
+                # If postgis returns distance in DEGREES (SOMEHOW POSSIBLE) recalc to meters
+                dist_in_meters = obj.distance * 111320
+            return round(dist_in_meters, 2)
+        return None
 
 
 class WeeklyReportSerializer(serializers.ModelSerializer):

@@ -6,6 +6,8 @@ import useBuildings from '../hooks/useBuildings';
 import CameraCapture from '../components/report/CameraCapture';
 import LocationPicker from '../components/report/LocationPicker';
 import Toast, { useToast } from '../components/common/Toast';
+import DuplicateModal from '../components/report/DuplicateModal';
+import api from '../services/api';
 
 /**
  * ReportForm — Full responsive fault-report form (mobile-first).
@@ -41,6 +43,9 @@ export default function ReportForm() {
 
 
   const [isMobile, setIsMobile] = useState(true);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [nearbyTickets, setNearbyTickets] = useState([]);
+  const [isPrechecking, setIsPrechecking] = useState(false);
 
   /* ── Mobile Check ── */
   useEffect(() => {
@@ -85,18 +90,46 @@ export default function ReportForm() {
     return Object.keys(errs).length === 0;
   };
 
-  /* ── Submit ── */
+  /* ── Submit (FOR DUPLICATE) ── */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validate()) {
       showToast('error', 'Formularz zawiera błędy. Popraw zaznaczone pola.');
-      // Scroll to first error
       const firstErrorEl = document.querySelector('[data-field-error]');
       firstErrorEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    setIsPrechecking(true);
+    // PRE-CHECK FOR DUPLICATES
+    try {
+      const res = await api.get('/tickets/nearby/', {
+        params: {
+          lat: location.lat,
+          lng: location.lng,
+          category_id: categoryId,
+          radius: 50, // promien w metrach
+          building_id: buildingId || ''
+        }
+      });
+      if (res.data.results && res.data.results.length > 0) {
+        setNearbyTickets(res.data.results);
+        setShowDuplicateModal(true);
+        setIsPrechecking(false);
+        return; //stop to show duplicate modal
+      }
+      //if no duplicates
+      await executeNormalSubmit();
+    } catch (err) {
+      console.warn("Błąd pre-checku duplikatów:", err);
+      await executeNormalSubmit();
+    }
+  };
 
+
+  /* ── Submit ── */
+  const executeNormalSubmit = async () => {
+    setIsPrechecking(false);
     try {
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -111,18 +144,44 @@ export default function ReportForm() {
 
       setSubmitted(true);
       showToast('success', 'Zgłoszenie zostało wysłane! Przekierowuję…');
-
       setTimeout(() => navigate('/my-tickets'), 2000);
     } catch (err) {
       const locationErrors = [
         'Lokalizacja znajduje się poza granicami kampusu.',
         'Lokalizacja jest zbyt daleko od wybranego budynku (maks. 300m).',
       ];
-      if (locationErrors.includes(err.message)) {
-        setLocation(null);
-      }
+      if (locationErrors.includes(err.message)) setLocation(null);
       showToast('error', err.message);
     }
+  };
+
+  /* ── Confirm Duplicate ── */
+  const handleConfirmDuplicate = async (parentTicketId) => {
+    try {
+      const payload = {
+        new_ticket_data: {
+          title: title.trim(),
+          description: description.trim(),
+          category_id: categoryId,
+          latitude: location.lat,
+          longitude: location.lng
+        }
+      };
+
+      await api.post(`/tickets/${parentTicketId}/confirm-duplicate/`, payload);
+
+      setShowDuplicateModal(false);
+      showToast('success', 'Zgłoszenie podpięte. Przekierowuję…');
+      setTimeout(() => navigate('/my-tickets'), 2000);
+    } catch (err) {
+      showToast('error', 'Wystąpił błąd podczas podpinania zgłoszenia.');
+    }
+  };
+
+  /* ── Reject Duplicate ── */
+  const handleRejectDuplicate = () => {
+    setShowDuplicateModal(false);
+    executeNormalSubmit();
   };
 
   /* ── Skeleton loader for selects ── */
@@ -159,6 +218,15 @@ export default function ReportForm() {
   return (
     <>
       <Toast {...toast} />
+        {/* ── Duplicate Modal ── */}
+        {showDuplicateModal && (
+        <DuplicateModal
+          tickets={nearbyTickets}
+          onConfirm={handleConfirmDuplicate}
+          onReject={handleRejectDuplicate}
+          onClose={() => setShowDuplicateModal(false)}
+        />
+      )}
 
       <main className="flex-1 overflow-y-auto scrollbar-thin">
         {/* ── Sticky header ── */}
@@ -344,17 +412,17 @@ export default function ReportForm() {
           <div className="pt-4">
             <button
               type="submit"
-              disabled={submitting || submitted || loadingData}
+              disabled={submitting || submitted || loadingData || isPrechecking}
               className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold text-base shadow-lg shadow-primary/20
                 hover:shadow-xl hover:shadow-primary/30 hover:scale-[0.98] active:scale-95
                 transition-all duration-200 cursor-pointer
                 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-lg
                 flex items-center justify-center gap-2"
             >
-              {submitting ? (
+              {(submitting || isPrechecking) ? (
                 <>
                   <span className="material-symbols-outlined text-xl animate-spin">progress_activity</span>
-                  Wysyłanie…
+                  Przetwarzanie…
                 </>
               ) : submitted ? (
                 <>

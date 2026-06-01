@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
-import { useAuth } from "../context/AuthContext";
+import {useState, useEffect, useMemo} from 'react';
+import {MapContainer, TileLayer, Marker} from 'react-leaflet';
+import {useAuth} from "../context/AuthContext";
 import 'leaflet/dist/leaflet.css';
 import api from '../services/api';
 import StatusBadge from '../components/common/StatusBadge';
 import '../utils/leafletSetup';
-import { formatDate, PRIORITY_LABELS } from '../utils/formatters';
+import {formatDate, PRIORITY_LABELS} from '../utils/formatters';
 
 
 const mapStatusToBadge = (apiStatus) => {
@@ -67,6 +67,24 @@ const getImageUrl = (imagePath) => {
     return imagePath;
 };
 
+const getCoordinates = (location) => {
+    if (!location) return [51.7535, 19.4520]; //fallback on location on campus a
+    //geojson object
+    if (location.coordinates && Array.isArray(location.coordinates)) {
+        return [location.coordinates[1], location.coordinates[0]];
+    }
+    //pointfield text
+    if (typeof location === 'string') {
+        const match = location.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+        if (match) {
+            const lng = parseFloat(match[1]);
+            const lat = parseFloat(match[2]);
+            return [lat, lng];
+        }
+    }
+    return [51.7535, 19.4520];//fallback on location on campus a
+};
+
 const getAuditFieldLabel = (fieldChanged) => {
     const labels = {
         status: 'status',
@@ -103,66 +121,73 @@ const getAuditChangeText = (entry) => {
 };
 
 //ticket card display
-const TicketCard = ({ ticket, onClick }) => {
+const TicketCard = ({ticket, onClick}) => {
+    const displayImage = ticket.image || ticket.parent_details?.image;
     return (
         <div
-            className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row h-full cursor-pointer"
+            className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all flex flex-col md:flex-row md:h-52 h-full cursor-pointer relative"
             onClick={() => onClick(ticket)}>
+
             {/* image section */}
-            <div className="md:w-1/3 relative h-48 md:h-auto overflow-hidden bg-slate-100">
-                {ticket.image ? (
+            <div className="md:w-1/3 relative h-48 md:h-full overflow-hidden bg-slate-100 shrink-0">
+                {displayImage ? (
                     <img
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        src={getImageUrl(ticket.image)}
+                        src={getImageUrl(displayImage)}
                         alt={ticket.title}
                     />
                 ) : (
                     <div
-                        className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">Brak
-                        zdjęcia</div>
+                        className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                        Brak zdjęcia
+                    </div>
                 )}
             </div>
+
             {/* ticket main body section */}
-            <div className="md:w-2/3 p-6 flex flex-col justify-between">
-                <div>
-                    <div className="flex justify-between items-start mb-2">
-                        <span
-                            className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">ID: #REP-{ticket.id}</span>
-                        <span className="text-xs text-slate-500 font-medium">{formatDate(ticket.created_at)}</span>
+            <div className="md:w-2/3 p-5 md:p-6 pb-20 md:pb-16 flex flex-col min-w-0 w-full relative">
+                <div className="flex flex-col">
+                    <div className="flex justify-between items-start mb-1">
+                        <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase shrink-0">ID: #REP-{ticket.id}</span>
+                        <span className="text-xs text-slate-500 font-medium shrink-0 ml-2">{formatDate(ticket.created_at)}</span>
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-primary transition-colors">{ticket.title}</h3>
-                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-4">
-                        <span className="material-symbols-outlined text-lg">location_on</span>
-                        <span>
+
+                    <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-primary transition-colors line-clamp-2"
+                        title={ticket.title}>
+                        {ticket.title}
+                    </h3>
+
+                    <div className="flex items-center gap-1 text-slate-500 text-sm">
+                        <span className="material-symbols-outlined text-lg shrink-0">location_on</span>
+                        <span className="line-clamp-1" title={ticket.building?.name}>
                             {ticket.building?.name || "Teren kampusu"}
                         </span>
                     </div>
                 </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                    <div className="flex items-center gap-2">
-                        <StatusBadge status={mapStatusToBadge(ticket.status)} />
+                {/* bottom panel with status and detailed look button*/}
+                <div className="absolute bottom-5 left-5 right-5 md:bottom-6 md:left-6 md:right-6 flex items-center justify-between pt-3 md:pt-4 border-t border-slate-100 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <StatusBadge status={mapStatusToBadge(ticket.status)}/>
                     </div>
                     <button
                         className="text-primary font-bold text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                         Zobacz szczegóły <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     </button>
                 </div>
+
             </div>
         </div>
     );
 };
 
-const TicketModal = ({ ticket, onClose }) => {
+const TicketModal = ({ticket, onClose}) => {
     if (!ticket) return null;
     // Leaflet expects [lat, lng] - coordinates from DB are [lng, lat]
-    const position = ticket.location?.coordinates
-        ? [ticket.location.coordinates[1], ticket.location.coordinates[0]]
-        : [51.7535, 19.4520];
+    const position = getCoordinates(ticket.location)
     const hasAuditLog = ticket.audit_log && ticket.audit_log.length > 0;
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-            <div className="absolute inset-0" onClick={onClose} />
+            <div className="absolute inset-0" onClick={onClose}/>
             <div
                 className="relative bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
@@ -179,9 +204,37 @@ const TicketModal = ({ ticket, onClose }) => {
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
+                    {/* --- Duplicate info --- */}
+                    {ticket.parent_details && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3">
+                            <div className="flex items-start gap-3">
+                                <span className="material-symbols-outlined text-amber-600 mt-0.5">link</span>
+                                <div>
+                                    <h5 className="font-bold text-amber-800 text-sm">Zgłoszenie połączone
+                                        (Duplikat)</h5>
+                                    <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                                        To zgłoszenie zostało oznaczone jako duplikat i podpięte pod zgłoszenie główne
+                                        <strong className="ml-1 text-amber-950 font-extrabold">
+                                            #REP-{ticket.parent_details.id}
+                                        </strong>.<br/>
+                                        Zdjęcie dodane do tego zgłoszenia zostało zastąpione zdjęciem pochodzącym ze
+                                        zgłoszenia nadrzędnego.
+                                        Jeśli uważasz, że zgłoszenie zostało nieprawidłowo zidentyfikowane jako duplikat
+                                        lub występują inne problemy, skontaktuj się z administratorem lub koordynatorem.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info about parent ticket */}
+                            <div
+                                className="bg-white/80 border border-amber-100 rounded-xl p-3 pl-4 flex flex-col gap-1.5 text-xs text-amber-900">
+                                <p><strong>Tytuł zgłoszenia głównego:</strong> {ticket.parent_details.title}</p>
+                            </div>
+                        </div>
+                    )}
                     {/* Status and Priority */}
                     <div className="flex flex-wrap gap-3">
-                        <StatusBadge status={mapStatusToBadge(ticket.status)} />
+                        <StatusBadge status={mapStatusToBadge(ticket.status)}/>
                         {ticket.priority && (
                             <div
                                 className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL'
@@ -189,7 +242,7 @@ const TicketModal = ({ ticket, onClose }) => {
                                     : ticket.priority === 'MEDIUM'
                                         ? 'bg-orange-100 text-orange-700 border-orange-200'
                                         : 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                    }`}>
+                                }`}>
                                 Priorytet: {PRIORITY_LABELS[ticket.priority] || ticket.priority}
                             </div>
                         )}
@@ -214,15 +267,15 @@ const TicketModal = ({ ticket, onClose }) => {
                     </div>
 
                     {/* Image */}
-                    {ticket.image && (
+                    {(ticket.image || ticket.parent_details?.image) && (
                         <div>
                             <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
                                 <span className="material-symbols-outlined">photo_camera</span>
-                                Zdjęcie usterki
+                                {ticket.image ? "Zdjęcie usterki" : "Zdjęcie ze zgłoszenia głównego"}
                             </h4>
                             <img
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                src={getImageUrl(ticket.image)}
+                                className="w-full h-auto rounded-2xl border border-slate-200"
+                                src={getImageUrl(ticket.image || ticket.parent_details.image)}
                                 alt={ticket.title}
                             />
                         </div>
@@ -252,8 +305,8 @@ const TicketModal = ({ ticket, onClose }) => {
                                 className="h-full w-full"
                                 scrollWheelZoom={false}
                             >
-                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                                <Marker position={position} />
+                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                                <Marker position={position}/>
                             </MapContainer>
                         </div>
                     </div>
@@ -266,7 +319,7 @@ const TicketModal = ({ ticket, onClose }) => {
                             <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
                                 {ticket.audit_log.map((entry, idx) => (
                                     <div key={entry.id || idx}
-                                        className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
+                                         className="flex gap-4 text-sm border-l-2 border-slate-200 pl-4">
                                         <div className="text-slate-400 whitespace-nowrap">
                                             {formatDate(entry.created_at)}
                                         </div>
@@ -275,10 +328,12 @@ const TicketModal = ({ ticket, onClose }) => {
                                                 {entry.user?.first_name} {entry.user?.last_name}
                                             </span>
                                             <span className="text-slate-500"> zmienił(a) </span>
-                                            <span className="font-medium">{getAuditFieldLabel(entry.field_changed)}</span>
+                                            <span
+                                                className="font-medium">{getAuditFieldLabel(entry.field_changed)}</span>
                                             <div className="text-slate-500 mt-0.5">
                                                 {entry.field_changed === 'assigned_to'
-                                                    ? <span className="font-medium text-emerald-600">{getAuditChangeText(entry)}</span>
+                                                    ? <span
+                                                        className="font-medium text-emerald-600">{getAuditChangeText(entry)}</span>
                                                     : getAuditChangeText(entry)
                                                 }
                                             </div>
@@ -301,7 +356,7 @@ const TicketModal = ({ ticket, onClose }) => {
 // main page
 
 export default function MyTickets() {
-    const { user } = useAuth();
+    const {user} = useAuth();
     const [tickets, setTickets] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Wszystkie');
@@ -313,17 +368,40 @@ export default function MyTickets() {
         if (!user) {
             return;
         }
+        let isMounted = true;
         const endpoint = isCoordinator ? 'tickets/' : 'tickets/my/';
-        api.get(endpoint).then(res => {
-            setTickets(res.data.results || []);
-            setIsLoading(false);
-        }).catch(err => {
-            console.error("Błąd pobierania zgłoszeń:", err);
-            setIsLoading(false);
-        });
+        const fetchAllTickets = async () => {
+            setIsLoading(true);
+            try {
+                let allResults = [];
+                let currentUrl = endpoint;
+                while (currentUrl) {
+                    const res = await api.get(currentUrl);
+                    allResults = [...allResults, ...(res.data.results || [])];
+                    let nextUrl = res.data.next;
+                    if (nextUrl && nextUrl.includes('backend:8000')) {
+                        nextUrl = nextUrl.replace('backend:8000', 'localhost:8000');
+                    }
+                    currentUrl = nextUrl;
+                }
+                if (isMounted) {
+                    setTickets(allResults);
+                    setIsLoading(false);
+                }
+            } catch (err) {
+                console.error("Błąd pobierania zgłoszeń: ", err);
+                if (isMounted) {
+                    setIsLoading(false);
+                }
+            }
+        };
+        fetchAllTickets();
+        return () => {
+            isMounted = false;
+        };
     }, [user, isCoordinator]);
 
-    // Filter logic
+// Filter logic
     const filteredTickets = useMemo(() => {
         if (activeTab === 'Wszystkie') return tickets;
         if (activeTab === 'Oczekujące') return tickets.filter(t => t.status === 'NEW');
@@ -332,7 +410,7 @@ export default function MyTickets() {
         return tickets;
     }, [tickets, activeTab]);
 
-    // Stats
+// Stats
     const stats = useMemo(() => ({
         total: tickets.length,
         pending: tickets.filter(t => t.status === 'NEW').length,
@@ -341,7 +419,8 @@ export default function MyTickets() {
     }), [tickets]);
 
     return (
-        <div className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend_Variable']">
+        <div
+            className="p-6 md:p-8 w-full max-w-7xl mx-auto h-full max-h-[100dvh] flex flex-col font-['Lexend_Variable']">
             <div className="mb-3 shrink-0">
                 <p className="text-primary text-xl font-bold text-slate-900 mb-2">
                     {isCoordinator ? "Panel Koordynatora" : "Podsumowanie konta"}
@@ -356,7 +435,7 @@ export default function MyTickets() {
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`px-6 py-3 font-bold transition-all border-b-2 ${activeTab === tab ? 'text-primary border-primary' : 'text-slate-500 border-transparent hover:text-primary'
-                                }`}
+                            }`}
                         >
                             {tab}
                         </button>
@@ -368,7 +447,7 @@ export default function MyTickets() {
                     {isLoading ? (
                         <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 animate-pulse">
                             {[1, 2, 3, 4].map(i => <div key={i}
-                                className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
+                                                        className="bg-white rounded-2xl h-64 border border-slate-100"></div>)}
                         </div>
                     ) : filteredTickets.length === 0 ? (
                         <div className="w-full flex-1 flex flex-col items-center justify-center py-24 text-slate-400">
@@ -381,26 +460,26 @@ export default function MyTickets() {
                     ) : (
                         <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6">
                             {filteredTickets.map(ticket => (
-                                <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket} />
+                                <TicketCard key={ticket.id} ticket={ticket} onClick={setSelectedTicket}/>
                             ))}
                         </div>
                     )}
                 </div>
 
                 <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary" />
-                    <StatItem label="Oczekujące" value={stats.pending} color="text-error" />
-                    <StatItem label="W trakcie" value={stats.progress} color="text-blue-600" />
-                    <StatItem label="Rozwiązane" value={stats.resolved} color="text-secondary" />
+                    <StatItem label="Łącznie aktywnych" value={stats.total} color="text-primary"/>
+                    <StatItem label="Oczekujące" value={stats.pending} color="text-error"/>
+                    <StatItem label="W trakcie" value={stats.progress} color="text-blue-600"/>
+                    <StatItem label="Rozwiązane" value={stats.resolved} color="text-secondary"/>
                 </div>
 
             </div>
-            <TicketModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
+            <TicketModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)}/>
         </div>
     );
 }
 
-function StatItem({ label, value, color }) {
+function StatItem({label, value, color}) {
     return (
         <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
             <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
