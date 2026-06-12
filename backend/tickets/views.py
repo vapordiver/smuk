@@ -348,6 +348,12 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 new_value=serializer.validated_data['status']
             )
 
+            Notification.objects.create(
+                user=ticket.reporter,
+                ticket=ticket,
+                message=serializer.validated_data['status']
+            )    
+
         if 'priority' in serializer.validated_data and serializer.validated_data['priority'] != old_priority:
             AuditLog.objects.create(
                 ticket=ticket,
