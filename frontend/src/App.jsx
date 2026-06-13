@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'react';
 import {BrowserRouter, Routes, Route, Outlet, useLocation} from 'react-router-dom';
 import {AuthProvider} from "./context/AuthContext";
+import { NotificationProvider } from './context/NotificationContext';
 import TopNavBar from './components/layout/TopNavBar';
 import SideNavBar from './components/layout/SideNavBar';
 import Dashboard from './pages/Dashboard';
@@ -47,26 +48,28 @@ function Layout() {
 export default function App() {
     return (
         <AuthProvider>
-            <BrowserRouter>
-                <Routes>
-                    {/* Routes with sidebar layout */}
-                    <Route element={<Layout/>}>
-                        <Route path="/" element={<Dashboard/>}/>
-                        <Route path="/map" element={<CampusMap/>}/>
-                        <Route element={<ProtectedRoute/>}>
-                            <Route path="/report" element={<ReportForm/>}/>
-                            <Route path="/my-tickets" element={<MyTickets/>}/>
-                            <Route path="/profile" element={<ProfilePage/>}/>
+            <NotificationProvider>
+                <BrowserRouter>
+                    <Routes>
+                        {/* Routes with sidebar layout */}
+                        <Route element={<Layout/>}>
+                            <Route path="/" element={<Dashboard/>}/>
+                            <Route path="/map" element={<CampusMap/>}/>
+                            <Route element={<ProtectedRoute/>}>
+                                <Route path="/report" element={<ReportForm/>}/>
+                                <Route path="/my-tickets" element={<MyTickets/>}/>
+                                <Route path="/profile" element={<ProfilePage/>}/>
+                            </Route>
+                            <Route element={<ProtectedRoute allowedRoles={['coordinator']}/>}>
+                                <Route path="/admin" element={<CoordinatorPanel/>}/>
+                            </Route>
                         </Route>
-                        <Route element={<ProtectedRoute allowedRoles={['coordinator']}/>}>
-                            <Route path="/admin" element={<CoordinatorPanel/>}/>
-                        </Route>
-                    </Route>
-                    {/* Auth routes – no sidebar */}
-                    <Route path="/login" element={<Login/>}/>
-                    <Route path="/register" element={<Register/>}/>
-                </Routes>
-            </BrowserRouter>
+                        {/* Auth routes – no sidebar */}
+                        <Route path="/login" element={<Login/>}/>
+                        <Route path="/register" element={<Register/>}/>
+                    </Routes>
+                </BrowserRouter>
+            </NotificationProvider>
         </AuthProvider>
     );
 }
