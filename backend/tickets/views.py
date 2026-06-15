@@ -578,7 +578,9 @@ class StatsViewSet(viewsets.ViewSet):
         recent_logs = AuditLog.objects.select_related('ticket', 'user').filter(
             field_changed='status'
         ).order_by('-created_at')[:5]
-        recent_activity = []
+        # Recent activity - fetch last 5 tickets created
+        recent_tickets = Ticket.objects.select_related('reporter').order_by('-created_at')[:5]
+        combined_activity = []
         for log in recent_logs:
             user_data = None
             if log.user:
@@ -586,22 +588,39 @@ class StatsViewSet(viewsets.ViewSet):
                     "first_name": log.user.first_name,
                     "last_name": log.user.last_name
                 }
-            recent_activity.append({
+            combined_activity.append({
+                "type": "status_changed",
                 "ticket_id": log.ticket.id,
                 "ticket_title": log.ticket.title,
-                "action": "status_changed",
                 "old_value": log.old_value,
                 "new_value": log.new_value,
                 "user": user_data,
-                "created_at": log.created_at.isoformat()
+                "timestamp": log.created_at, #for sort
             })
+        for ticket in recent_tickets:
+            user_data = None
+            if ticket.reporter:
+                user_data = {"first_name": ticket.reporter.first_name, "last_name": ticket.reporter.last_name}
+                combined_activity.append({
+                    "type": "ticket_created",
+                    "ticket_id": ticket.id,
+                    "ticket_title": ticket.title,
+                    "old_value": None,
+                    "new_value": ticket.status,
+                    "user": user_data,
+                    "timestamp": ticket.created_at
+                })
+        combined_activity.sort(key=lambda x: x['timestamp'], reverse=True)
+        top_activity = combined_activity[:5]
+        for item in top_activity:
+            item["created_at"] = item.pop("timestamp").isoformat()
         return Response({
             "total_tickets": total_tickets,
             "open_count": open_count,
             "in_progress_count": in_progress_count,
             "resolved_count": resolved_count,
             "this_week_count": this_week_count,
-            "recent_activity": recent_activity
+            "recent_activity": top_activity
         })
 
     @action(detail=False, methods=['get'], url_path='my')

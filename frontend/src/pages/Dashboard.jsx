@@ -45,7 +45,7 @@ export default function Dashboard() {
   const [stats,setStats]=useState(null);
   const [activities, setActivities]=useState([]);
   const [loading, setLoading] = useState(true);
-useEffect(() => {
+  useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
@@ -56,12 +56,15 @@ useEffect(() => {
           const mappedActivities = res.data.recent_activity.map((act) => {
             const meta = getStatusMeta(act.new_value);
             const userStr = act.user ? `${act.user.first_name} ${act.user.last_name}` : 'System';
+            const actionText = act.type ==='ticket_created'
+              ? `Zgłoszono przez: ${userStr}`
+              : `Zmieniono przez: ${userStr}`;
             return {
-              id: `${act.ticket_id}-${act.created_at}`,
-              icon: meta.icon,
-              iconColor: meta.color,
+              id: `${act.ticket_id}-${act.created_at}-${act.type}`,
+              icon: act.type === 'ticket_created' ? 'add_circle' : meta.icon,
+              iconColor: act.type === 'ticket_created' ? 'text-primary' : meta.color,
               title: act.ticket_title,
-              location: `Zmieniono przez: ${userStr}`,
+              location: actionText, //why is ts called location, cant be bothered to change that anyway just wanted to vent, anyway info about who reported is more welcome than where it is at at first glance isnt it?
               status: act.new_value,
               time: formatTimeAgo(act.created_at),
             };
@@ -73,8 +76,8 @@ useEffect(() => {
           // in my opinion we should switch to /dashboard everywhere but if we do this then why did I even bother making /stats/my?????
           const resStats = await api.get('/stats/my/');
           setStats(resStats.data);
-          // normal account (NOT COORD) get this own last 3 tickets.
-          const resTickets = await api.get('/tickets/my/?limit=3&ordering=-updated_at');
+          // normal account (NOT COORD) get this own last 5 tickets.
+          const resTickets = await api.get('/tickets/my/?limit=5&ordering=-updated_at');
           const mappedTickets = resTickets.data.results.map((t) => {
             const meta = getStatusMeta(t.status);
             return {
