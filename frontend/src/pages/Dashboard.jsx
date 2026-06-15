@@ -1,4 +1,7 @@
+import { useState, useEffect} from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+import api from '../services/api'
 import StatCard from '../components/dashboard/StatCard';
 import RecentActivityCard from '../components/dashboard/RecentActivityCard';
 import DashboardMapPreview from '../components/dashboard/DashboardMapPreview';
@@ -7,104 +10,162 @@ import DashboardMapPreview from '../components/dashboard/DashboardMapPreview';
  * Dashboard – Main landing page matching screen.png / code.html
  * Bento Grid layout with StatCards, ImpactCTA, RecentActivity, CampusMap preview
  */
+//^ the hell is this comment lol xd "matching screen.png / code.html"
 
-/* ── Mock data ── */
-const RECENT_ACTIVITIES = [
-  {
-    id: 1,
-    icon: 'lightbulb',
-    iconColor: 'text-primary',
-    title: 'Uszkodzony panel LED',
-    location: 'Budynek A, Sala 402',
-    status: 'in-progress',
-    time: '2 godz. temu',
-  },
-  {
-    id: 2,
-    icon: 'water_drop',
-    iconColor: 'text-secondary',
-    title: 'Wykryto wyciek wody',
-    location: 'Aula Główna',
-    status: 'resolved',
-    time: '5 godz. temu',
-  },
-  {
-    id: 3,
-    icon: 'ac_unit',
-    iconColor: 'text-tertiary',
-    title: 'Konserwacja HVAC',
-    location: 'Biblioteka Główna – Piętro 2',
-    status: 'new',
-    time: 'Wczoraj',
-  },
-];
+//better date formatting
+const formatTimeAgo = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now - date) / 1000);
+  if (diffInSeconds < 60) return 'Przed chwilą';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min. temu`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} godz. temu`;
+  if (diffInSeconds < 172800) return 'Wczoraj';
+  //date diff bigger than a day
+  return date.toLocaleDateString('pl-PL');
+};
+
+//status badges / icons
+const getStatusMeta = (status) => {
+  switch (status) {
+    case 'NEW': return { icon: 'fiber_new', color: 'text-error' };
+    case 'IN_PROGRESS': return { icon: 'construction', color: 'text-primary' };
+    case 'NEEDS_REVIEW': return { icon: 'find_in_page', color: 'text-tertiary' };
+    case 'RESOLVED': return { icon: 'task_alt', color: 'text-secondary' };
+    case 'CLOSED': return { icon: 'done_all', color: 'text-on-surface-variant' };
+    case 'ARCHIVED': return { icon: 'inventory_2', color: 'text-on-surface-variant' };
+    default: return { icon: 'update', color: 'text-primary' };
+  }
+};
+
+//NO MORE MOCK NO WAY
 
 export default function Dashboard() {
+  const {user}=useAuth();
+  const [stats,setStats]=useState(null);
+  const [activities, setActivities]=useState([]);
+  const [loading, setLoading] = useState(true);
+useEffect(() => {
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      try {
+        if (user?.role === 'coordinator') {
+          //coord gets all the data here ;)
+          const res = await api.get('/stats/dashboard/');
+          setStats(res.data);
+          const mappedActivities = res.data.recent_activity.map((act) => {
+            const meta = getStatusMeta(act.new_value);
+            const userStr = act.user ? `${act.user.first_name} ${act.user.last_name}` : 'System';
+            return {
+              id: `${act.ticket_id}-${act.created_at}`,
+              icon: meta.icon,
+              iconColor: meta.color,
+              title: act.ticket_title,
+              location: `Zmieniono przez: ${userStr}`,
+              status: act.new_value,
+              time: formatTimeAgo(act.created_at),
+            };
+          });
+          setActivities(mappedActivities);
+
+        } else if (user) {
+          // I guess we use /my for user but on fresh account it looks kinda depressing as if nobody uses our services?
+          // in my opinion we should switch to /dashboard everywhere but if we do this then why did I even bother making /stats/my?????
+          const resStats = await api.get('/stats/my/');
+          setStats(resStats.data);
+          // normal account (NOT COORD) get this own last 3 tickets.
+          const resTickets = await api.get('/tickets/my/?limit=3&ordering=-updated_at');
+          const mappedTickets = resTickets.data.results.map((t) => {
+            const meta = getStatusMeta(t.status);
+            return {
+              id: t.id,
+              icon: meta.icon,
+              iconColor: meta.color,
+              title: t.title,
+              location: t.category?.name || 'Inna kategoria',
+              status: t.status,
+              time: formatTimeAgo(t.updated_at),
+            };
+          });
+          setActivities(mappedTickets);
+        }
+      } catch (error) {
+        console.error('An error occurred while trying to load dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  const isCoordinator = user?.role === 'coordinator';
   return (
     <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 lg:p-10 scrollbar-thin">
       <header className="mb-10">
         <h1 className="text-[36px] font-bold tracking-tight text-on-background mb-2">
-          Witaj, Użytkowniku!
+          Witaj, {user?.first_name || 'Użytkowniku'}!
         </h1>
         <p className="text-on-surface-variant">
-          Oto przegląd usterek na Twoim kampusie na dziś.
+          Oto przegląd {isCoordinator ? 'zgłoszeń na kampusie' : 'Twoich zgłoszeń'}.
         </p>
       </header>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Stat: in progress  */}
+        {/* top-left stat card (open/total) */}
         <div className="lg:col-span-3">
           <StatCard
-            icon="pending_actions"
+            loading={loading}
+            icon={isCoordinator ? "pending_actions" : "assignment"}
             iconColor="text-primary"
-            badge="Aktywne"
+            badge={isCoordinator ? "Otwarte" : "Zgłoszone"}
             badgeColor="bg-primary/10 text-primary"
-            value={12}
+            //coord gets open, normal user total tickets, cause this seems more reasonable, and thanks to this im using all the data i get from api lol
+            //worth to point out that user gets this from his own data if someone FORGOT to read COMMENTS OR CODE ABOVE
+            value={isCoordinator ? (stats?.open_count ?? 0) : (stats?.total_tickets ?? 0)}
             unit="Zgłoszeń"
-            description="W trakcie realizacji"
+            description={isCoordinator ? "Wymaga weryfikacji i naprawy" : "Wszystkie Twoje zgłoszenia"}
           />
         </div>
 
-        {/* Stat: resolved  */}
+        {/* mid stat card (completed) */}
         <div className="lg:col-span-3">
           <StatCard
-            icon="check_circle"
+            loading={loading}
+            icon={isCoordinator ? "task_alt" : "check_circle"}
             iconColor="text-secondary"
-            badge="Gotowe"
+            badge="Rozwiązane"
             badgeColor="bg-secondary/10 text-secondary"
-            value={48}
+            //coord gets resolved only, normal user gets resolved and closed dk how we want to this someone plz provide input
+            //worth to point out that user gets this from his own data if someone FORGOT to read COMMENTS OR CODE ABOVE
+            value={isCoordinator ? (stats?.resolved_count ?? 0) : ((stats?.resolved_count ?? 0) + (stats?.closed_count ?? 0))}
             unit="Zadań"
-            description="Rozwiązane w tym miesiącu"
+            description="Zgłoszenia zakończone sukcesem"
           />
         </div>
 
-        {/* CTA Impact Card – "Zgłoś usterkę" */}
+        {/* report href */}
         <div className="lg:col-span-6">
-          <Link to="/report" className="block">
-            <div className="bg-primary rounded-xl p-8 shadow-lg shadow-primary/20 flex flex-col justify-center text-on-primary relative overflow-hidden group hover:scale-[0.98] transition-transform cursor-pointer h-full">
+          <Link to="/report" className="block h-full">
+            <div className="bg-primary rounded-xl p-8 shadow-lg shadow-primary/20 flex flex-col justify-center text-on-primary relative overflow-hidden group hover:scale-[0.98] transition-transform cursor-pointer h-full min-h-[160px]">
               <div className="relative z-10">
                 <div className="flex items-center gap-4 mb-4">
-                  <span className="material-symbols-outlined text-5xl">
-                    emergency_home
-                  </span>
+                  <span className="material-symbols-outlined text-5xl">emergency_home</span>
                   <h2 className="text-2xl font-bold">Zgłoś usterkę</h2>
                 </div>
                 <p className="text-primary-fixed-dim max-w-xs">
-                  Zauważyłeś problem? Prześlij szybkie zgłoszenie, a nasz zespół
-                  konserwacji zajmie się nim natychmiast.
+                  Zauważyłeś problem? Prześlij szybkie zgłoszenie, a nasz zespół zajmie się nim natychmiast.
                 </p>
               </div>
               <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-110 transition-transform" />
             </div>
           </Link>
         </div>
-
-        {/* Recent Activity */}
-        <div className="lg:col-span-8">
-          <RecentActivityCard items={RECENT_ACTIVITIES} />
+        {/* recent activity */}
+        <div className="lg:col-span-8 flex flex-col">
+          <RecentActivityCard items={activities} loading={loading} />
         </div>
-
-        {/* Campus Map Preview*/}
+        {/* campus map */}
         <div className="lg:col-span-4 relative h-full min-h-[400px]">
           <div className="absolute inset-0 z-10 rounded-xl overflow-hidden shadow-soft bg-surface border border-outline transition-all duration-300 ease-out origin-center hover:z-30 hover:scale-105 hover:shadow-2xl hover:shadow-primary/30 flex flex-col">
             <div className="p-6 bg-surface">
@@ -119,9 +180,7 @@ export default function Dashboard() {
                 to="/map"
                 className="absolute bottom-4 right-4 bg-white px-3 py-2 rounded-lg shadow-md border border-outline hover:bg-surface-container-low transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold text-primary z-30"
               >
-                <span className="material-symbols-outlined text-base">
-                  open_in_new
-                </span>
+                <span className="material-symbols-outlined text-base">open_in_new</span>
                 Otwórz mapę
               </Link>
             </div>
