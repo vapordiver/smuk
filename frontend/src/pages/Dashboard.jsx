@@ -119,13 +119,13 @@ export default function Dashboard() {
         <div className="lg:col-span-3">
           <StatCard
             loading={loading}
-            icon={isCoordinator ? "pending_actions" : "assignment"}
+            icon={isCoordinator ? "assignment" : "pending_actions"}
             iconColor="text-primary"
             badge={isCoordinator ? "Otwarte" : "Zgłoszone"}
             badgeColor="bg-primary/10 text-primary"
             //coord gets open, normal user total tickets, cause this seems more reasonable, and thanks to this im using all the data i get from api lol
             //worth to point out that user gets this from his own data if someone FORGOT to read COMMENTS OR CODE ABOVE
-            value={isCoordinator ? (stats?.open_count ?? 0) : (stats?.total_tickets ?? 0)}
+            value={isCoordinator ? (stats?.total_tickets ?? 0) : (stats?.open_count ?? 0)}
             unit="Zgłoszeń"
             description={isCoordinator ? "Wymaga weryfikacji i naprawy" : "Wszystkie Twoje zgłoszenia"}
           />
@@ -141,7 +141,7 @@ export default function Dashboard() {
             badgeColor="bg-secondary/10 text-secondary"
             //coord gets resolved only, normal user gets resolved and closed dk how we want to this someone plz provide input
             //worth to point out that user gets this from his own data if someone FORGOT to read COMMENTS OR CODE ABOVE
-            value={isCoordinator ? (stats?.resolved_count ?? 0) : ((stats?.resolved_count ?? 0) + (stats?.closed_count ?? 0))}
+            value={user ? ((stats?.resolved_count ?? 0) + (stats?.closed_count ?? 0)) : 0}
             unit="Zadań"
             description="Zgłoszenia zakończone sukcesem"
           />
