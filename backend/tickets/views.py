@@ -7,7 +7,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
 from .models import Building, FaultCategory, Ticket, Campus, AuditLog, WeeklyReport
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, WeeklyReportSerializer, NearbyTicketSerializer
+from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, \
+    TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, WeeklyReportSerializer, NearbyTicketSerializer
 from .filters import TicketFilter
 from .utils import compress_image_to_webp
 from .throttles import TicketCreateThrottle
@@ -15,8 +16,10 @@ from django.contrib.gis.geos import Polygon, Point
 from django.contrib.gis.db.models.functions import SnapToGrid, Distance
 from django.db import transaction
 from django.contrib.gis.measure import D
-from django.db.models import Count
+from django.db.models import Count, Q
+from django.utils import timezone
 from .tasks import calculate_priority
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +96,6 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         if self.action == 'create':
             return [TicketCreateThrottle()]
         return []
-
 
     def handle_exception(self, exc):
         response = super().handle_exception(exc)
@@ -437,7 +439,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
         point = Point(lng, lat, srid=4326)
 
-        #basic filter
+        # basic filter
         filter_kwargs = {
             'category_id': category_id,
             'status__in': ['NEW', 'IN_PROGRESS', 'NEEDS_REVIEW'],
@@ -445,7 +447,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             'location__distance_lte': (point, D(m=radius))
         }
 
-        #subticket in the same building or outside buildings
+        # subticket in the same building or outside buildings
         if building_id:
             filter_kwargs['building_id'] = building_id
         else:
@@ -519,7 +521,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
         # pinning the ticket without the img, cosiek add AI here my compadre
         with transaction.atomic():
             child_ticket = Ticket.objects.create(
-                title=validated_data.get('title',parent_ticket.title),
+                title=validated_data.get('title', parent_ticket.title),
                 description=validated_data['description'],
                 category_id=validated_data['category_id'],
                 location=parent_ticket.location,
@@ -538,6 +540,7 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
             "verification_status": "CONFIRMED_MANUALLY"
         }, status=status.HTTP_201_CREATED)
 
+
 class WeeklyReportListView(generics.ListAPIView):
     """
     GET /api/reports/weekly/
@@ -547,3 +550,70 @@ class WeeklyReportListView(generics.ListAPIView):
     queryset = WeeklyReport.objects.all()
     serializer_class = WeeklyReportSerializer
     permission_classes = [IsAuthenticated, IsInCoordinatorGroup]
+
+
+class StatsViewSet(viewsets.ViewSet):
+    """
+    ViewSet for dashboard and personal stats.
+    GET /api/stats/dashboard/
+    GET /api/stats/my/
+    """
+
+    def get_permissions(self):
+        if self.action == 'dashboard':
+            return [IsAuthenticated(), IsInCoordinatorGroup()]
+        return [IsAuthenticated()]
+
+    @action(detail=False, methods=['get'], url_path='dashboard')
+    def dashboard(self, request):
+        now = timezone.now()
+        week_ago = now - timedelta(days=7)
+        # Count statistics for coordinator
+        total_tickets = Ticket.objects.count()
+        open_count = Ticket.objects.exclude(status__in=['RESOLVED', 'CLOSED', 'ARCHIVED']).count()
+        in_progress_count = Ticket.objects.filter(status='IN_PROGRESS').count()
+        resolved_count = Ticket.objects.filter(status='RESOLVED').count()
+        this_week_count = Ticket.objects.filter(created_at__gte=week_ago).count()
+        # Recent activity - fetch last 5 status changes
+        recent_logs = AuditLog.objects.select_related('ticket', 'user').filter(
+            field_changed='status'
+        ).order_by('-created_at')[:5]
+        recent_activity = []
+        for log in recent_logs:
+            user_data = None
+            if log.user:
+                user_data = {
+                    "first_name": log.user.first_name,
+                    "last_name": log.user.last_name
+                }
+            recent_activity.append({
+                "ticket_id": log.ticket.id,
+                "ticket_title": log.ticket.title,
+                "action": "status_changed",
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "user": user_data,
+                "created_at": log.created_at.isoformat()
+            })
+        return Response({
+            "total_tickets": total_tickets,
+            "open_count": open_count,
+            "in_progress_count": in_progress_count,
+            "resolved_count": resolved_count,
+            "this_week_count": this_week_count,
+            "recent_activity": recent_activity
+        })
+
+    @action(detail=False, methods=['get'], url_path='my')
+    def my(self, request):
+        # Personal statistics for the currently logged user
+        qs = Ticket.objects.filter(reporter=request.user)
+        stats = qs.aggregate(
+            total_tickets=Count('id'),
+            new_count=Count('id', filter=Q(status='NEW')),
+            in_progress_count=Count('id', filter=Q(status='IN_PROGRESS')),
+            resolved_count=Count('id', filter=Q(status='RESOLVED')),
+            closed_count=Count('id', filter=Q(status='CLOSED')),
+            needs_review_count=Count('id', filter=Q(status='NEEDS_REVIEW'))
+        )
+        return Response(stats)
