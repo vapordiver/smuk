@@ -7,6 +7,9 @@ class NotificationPagination(LimitOffsetPagination):
     """
     Pagination class for Notification model in accordance with API contract
     """
+
+    default_limit = 20
+
     def get_paginated_response(self, data):
         unread_count = Notification.objects.filter(
             user=self.request.user,
