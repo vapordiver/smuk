@@ -64,7 +64,7 @@ export default function NotificationDropdown() {
             onClick={(e) => e.stopPropagation()}
         >
             {/* ---- Header ---- */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-outline">
+            <div className="flex items-center justify-between px-4 py-3 bg-surface-container-low">
                 <h3 className="font-semibold text-on-surface text-sm">
                     Powiadomienia
                 </h3>
@@ -99,7 +99,6 @@ export default function NotificationDropdown() {
                             className={`
                                 w-full text-left px-4 py-3 flex items-start gap-3
                                 hover:bg-surface-container transition-colors cursor-pointer
-                                border-b border-outline last:border-b-0
                                 ${!notification.is_read ? 'bg-primary-fixed/40' : 'bg-transparent'}
                             `}
                         >
@@ -131,7 +130,7 @@ export default function NotificationDropdown() {
 
             {/* ---- Footer: info about length ---- */}
             {totalCount > notifications.length && (
-                <div className="px-4 py-2 text-center text-xs text-on-surface-variant border-t border-outline">
+                <div className="px-4 py-2 text-center text-xs text-on-surface-variant">
                     Wyświetlono {notifications.length} z {totalCount} powiadomień
                 </div>
             )}
