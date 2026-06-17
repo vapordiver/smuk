@@ -16,5 +16,7 @@ class NotificationPagination(LimitOffsetPagination):
         return Response({
             "count": self.count,
             "unread_count": unread_count,
+            "next": self.get_next_link(),
+            "previous": self.get_previous_link(),
             "results": data
         })
