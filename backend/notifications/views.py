@@ -25,7 +25,7 @@ class NotificationListView(generics.ListAPIView):
     pagination_class = NotificationPagination
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user)
+        return Notification.objects.filter(user=self.request.user).select_related("ticket")
 
 
 class NotificationMarkReadView(generics.UpdateAPIView):
