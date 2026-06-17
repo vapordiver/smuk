@@ -403,6 +403,13 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                         new_value=new_status
                     )
 
+                    Notification.objects.create(
+                        user=subticket.reporter,
+                        ticket=subticket,
+                        message=new_status,
+                    )
+
+
                 if new_priority and new_priority != old_priority:
                     subticket.priority = new_priority
                     update_fields.append('priority')
