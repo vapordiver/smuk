@@ -1409,6 +1409,7 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: "All notifications makred as read"
                   updated_count:
                     type: integer
 
