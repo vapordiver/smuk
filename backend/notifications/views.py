@@ -39,6 +39,8 @@ class NotificationMarkReadView(generics.UpdateAPIView):
 
     permission_classes = [IsAuthenticated, IsNotificationOwner]
 
+    http_method_names = ["patch", "options", "head"]
+
     def update(self, request, *args, **kwargs):
         # Accept only PATCH
         kwargs["partial"] = True
