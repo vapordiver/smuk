@@ -34,12 +34,14 @@ class NotificationMarkReadView(generics.UpdateAPIView):
     Endpoint to mark a specific notification as read.
     """
 
-    queryset = Notification.objects.all()
     serializer_class = NotificationMarkReadSerializer
 
     permission_classes = [IsAuthenticated, IsNotificationOwner]
 
     http_method_names = ["patch", "options", "head"]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         # Accept only PATCH
