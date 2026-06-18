@@ -204,10 +204,21 @@ HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY", "")
 
 # Media files & AWS S3
 
+# lokalnie
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 USE_S3 = os.environ.get("USE_S3", "False").lower() in ("true", "1")
 if USE_S3:
-    # w chmurze
-
     # klucze
     AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
@@ -222,7 +233,3 @@ if USE_S3:
 
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
-else:
-    # lokalnie
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR / "media"
