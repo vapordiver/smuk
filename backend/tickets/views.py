@@ -1,25 +1,36 @@
 import logging
-from rest_framework import generics, viewsets, mixins, status, filters
+
+from django.contrib.gis.db.models.functions import Distance, SnapToGrid
+from django.contrib.gis.geos import Point, Polygon
+from django.contrib.gis.measure import D
+from django.db import transaction
+from django.db.models import Count
+from django_filters.rest_framework import DjangoFilterBackend
+from notifications.models import Notification
+from rest_framework import filters, generics, mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.decorators import action
 from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
 from users.permissions import IsCoordinatorOrOwner, IsInCoordinatorGroup
-from .models import Building, FaultCategory, Ticket, Campus, AuditLog, WeeklyReport
-from .serializers import BuildingSerializer, FaultCategorySerializer, TicketDetailSerializer, TicketListSerializer, \
-    TicketCreateSerializer, CampusSerializer, TicketUpdateSerializer, WeeklyReportSerializer, NearbyTicketSerializer
-from .filters import TicketFilter
-from .utils import compress_image_to_webp
-from .throttles import TicketCreateThrottle
-from django.contrib.gis.geos import Polygon, Point
-from django.contrib.gis.db.models.functions import SnapToGrid, Distance
-from django.db import transaction
-from django.contrib.gis.measure import D
-from django.db.models import Count, Q
-from django.utils import timezone
-from .tasks import calculate_priority
 from datetime import timedelta
+from django.db.models import Q
+from django.utils import timezone
+from .filters import TicketFilter
+from .models import AuditLog, Building, Campus, FaultCategory, Ticket, WeeklyReport
+from .serializers import (
+    BuildingSerializer,
+    CampusSerializer,
+    FaultCategorySerializer,
+    NearbyTicketSerializer,
+    TicketCreateSerializer,
+    TicketDetailSerializer,
+    TicketListSerializer,
+    WeeklyReportSerializer,
+)
+from .tasks import calculate_priority
+from .throttles import TicketCreateThrottle
+from .utils import compress_image_to_webp
 
 logger = logging.getLogger(__name__)
 
@@ -329,8 +340,6 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
 
         self.perform_update(serializer)
 
-        from .models import AuditLog
-
         if 'status' in serializer.validated_data and serializer.validated_data['status'] != old_status:
             AuditLog.objects.create(
                 ticket=ticket,
@@ -339,6 +348,12 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                 old_value=old_status,
                 new_value=serializer.validated_data['status']
             )
+
+            Notification.objects.create(
+                user=ticket.reporter,
+                ticket=ticket,
+                message=serializer.validated_data['status']
+            )    
 
         if 'priority' in serializer.validated_data and serializer.validated_data['priority'] != old_priority:
             AuditLog.objects.create(
@@ -388,6 +403,13 @@ class TicketViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.L
                         old_value=old_subticket_status,
                         new_value=new_status
                     )
+
+                    Notification.objects.create(
+                        user=subticket.reporter,
+                        ticket=subticket,
+                        message=new_status,
+                    )
+
 
                 if new_priority and new_priority != old_priority:
                     subticket.priority = new_priority

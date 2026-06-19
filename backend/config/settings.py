@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "storages",
     "users",
     "tickets",
+    "notifications",
     "django_filters",
 ]
 
