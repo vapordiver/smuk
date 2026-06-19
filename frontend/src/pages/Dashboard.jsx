@@ -48,13 +48,13 @@ export default function Dashboard() {
           const mappedActivities = res.data.recent_activity.map((act) => {
             const meta = getStatusMeta(act.new_value);
             const userStr = act.user ? `${act.user.first_name} ${act.user.last_name}` : 'System';
-            const actionText = act.type ==='ticket_created'
+            const actionText = act.action ==='ticket_created'
               ? `Zgłoszono przez: ${userStr}`
               : `Zmieniono przez: ${userStr}`;
             return {
-              id: `${act.ticket_id}-${act.created_at}-${act.type}`,
-              icon: act.type === 'ticket_created' ? 'add_circle' : meta.icon,
-              iconColor: act.type === 'ticket_created' ? 'text-primary' : meta.color,
+              id: `${act.ticket_id}-${act.created_at}-${act.action}`,
+              icon: act.action === 'ticket_created' ? 'add_circle' : meta.icon,
+              iconColor: act.action === 'ticket_created' ? 'text-primary' : meta.color,
               title: act.ticket_title,
               location: actionText,
               status: act.new_value,

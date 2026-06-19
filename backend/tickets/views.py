@@ -590,7 +590,7 @@ class StatsViewSet(viewsets.ViewSet):
                     "last_name": log.user.last_name
                 }
             combined_activity.append({
-                "type": "status_changed",
+                "action": "status_changed",
                 "ticket_id": log.ticket.id,
                 "ticket_title": log.ticket.title,
                 "old_value": log.old_value,
@@ -603,7 +603,7 @@ class StatsViewSet(viewsets.ViewSet):
             if ticket.reporter:
                 user_data = {"first_name": ticket.reporter.first_name, "last_name": ticket.reporter.last_name}
             combined_activity.append({
-                "type": "ticket_created",
+                "action": "ticket_created",
                 "ticket_id": ticket.id,
                 "ticket_title": ticket.title,
                 "old_value": None,
