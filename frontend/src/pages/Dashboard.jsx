@@ -6,12 +6,6 @@ import StatCard from '../components/dashboard/StatCard';
 import RecentActivityCard from '../components/dashboard/RecentActivityCard';
 import DashboardMapPreview from '../components/dashboard/DashboardMapPreview';
 
-/**
- * Dashboard – Main landing page matching screen.png / code.html
- * Bento Grid layout with StatCards, ImpactCTA, RecentActivity, CampusMap preview
- */
-//^ the hell is this comment lol xd "matching screen.png / code.html"
-
 //better date formatting
 const formatTimeAgo = (dateString) => {
   const date = new Date(dateString);
@@ -38,8 +32,6 @@ const getStatusMeta = (status) => {
   }
 };
 
-//NO MORE MOCK NO WAY
-
 export default function Dashboard() {
   const {user}=useAuth();
   const [stats,setStats]=useState(null);
@@ -50,7 +42,7 @@ export default function Dashboard() {
       setLoading(true);
       try {
         if (user?.role === 'coordinator') {
-          //coord gets all the data here ;)
+          //coord gets all the data here
           const res = await api.get('/stats/dashboard/');
           setStats(res.data);
           const mappedActivities = res.data.recent_activity.map((act) => {
@@ -64,7 +56,7 @@ export default function Dashboard() {
               icon: act.type === 'ticket_created' ? 'add_circle' : meta.icon,
               iconColor: act.type === 'ticket_created' ? 'text-primary' : meta.color,
               title: act.ticket_title,
-              location: actionText, //why is ts called location, cant be bothered to change that anyway just wanted to vent, anyway info about who reported is more welcome than where it is at at first glance isnt it?
+              location: actionText,
               status: act.new_value,
               time: formatTimeAgo(act.created_at),
             };
@@ -72,8 +64,6 @@ export default function Dashboard() {
           setActivities(mappedActivities);
 
         } else if (user) {
-          // I guess we use /my for user but on fresh account it looks kinda depressing as if nobody uses our services?
-          // in my opinion we should switch to /dashboard everywhere but if we do this then why did I even bother making /stats/my?????
           const resStats = await api.get('/stats/my/');
           setStats(resStats.data);
           // normal account (NOT COORD) get this own last 5 tickets.
@@ -123,8 +113,6 @@ export default function Dashboard() {
             iconColor="text-primary"
             badge={isCoordinator ? "Otwarte" : "Zgłoszone"}
             badgeColor="bg-primary/10 text-primary"
-            //coord gets open, normal user total tickets, cause this seems more reasonable, and thanks to this im using all the data i get from api lol
-            //worth to point out that user gets this from his own data if someone FORGOT to read COMMENTS OR CODE ABOVE
             value={isCoordinator ? (stats?.total_tickets ?? 0) : (stats?.open_count ?? 0)}
             unit="Zgłoszeń"
             description={isCoordinator ? "Wymaga weryfikacji i naprawy" : "Wszystkie Twoje zgłoszenia"}
@@ -139,8 +127,6 @@ export default function Dashboard() {
             iconColor="text-secondary"
             badge="Rozwiązane"
             badgeColor="bg-secondary/10 text-secondary"
-            //coord gets resolved only, normal user gets resolved and closed dk how we want to this someone plz provide input
-            //worth to point out that user gets this from his own data if someone FORGOT to read COMMENTS OR CODE ABOVE
             value={user ? ((stats?.resolved_count ?? 0) + (stats?.closed_count ?? 0)) : 0}
             unit="Zadań"
             description="Zgłoszenia zakończone sukcesem"
