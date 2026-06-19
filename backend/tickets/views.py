@@ -573,7 +573,6 @@ class StatsViewSet(viewsets.ViewSet):
         open_count = Ticket.objects.exclude(status__in=['RESOLVED', 'CLOSED', 'ARCHIVED']).count()
         in_progress_count = Ticket.objects.filter(status='IN_PROGRESS').count()
         resolved_count = Ticket.objects.filter(status='RESOLVED').count()
-        closed_count = Ticket.objects.filter(status='CLOSED').count()
         this_week_count = Ticket.objects.filter(created_at__gte=week_ago).count()
         # Recent activity - fetch last 5 status changes
         recent_logs = AuditLog.objects.select_related('ticket', 'user').filter(
@@ -620,7 +619,6 @@ class StatsViewSet(viewsets.ViewSet):
             "open_count": open_count,
             "in_progress_count": in_progress_count,
             "resolved_count": resolved_count,
-            "closed_count": closed_count,
             "this_week_count": this_week_count,
             "recent_activity": top_activity
         })
