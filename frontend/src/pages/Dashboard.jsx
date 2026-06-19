@@ -115,7 +115,7 @@ export default function Dashboard() {
             iconColor="text-primary"
             badge={isCoordinator ? "Otwarte" : "Zgłoszone"}
             badgeColor="bg-primary/10 text-primary"
-            value={isCoordinator ? (stats?.total_tickets ?? 0) : (stats?.open_count ?? 0)}
+            value={user ? (stats?.open_count ?? 0) : 0}
             unit="Zgłoszeń"
             description={isCoordinator ? "Wymaga weryfikacji i naprawy" : "Wszystkie Twoje zgłoszenia"}
           />
@@ -129,7 +129,7 @@ export default function Dashboard() {
             iconColor="text-secondary"
             badge="Rozwiązane"
             badgeColor="bg-secondary/10 text-secondary"
-            value={user ? ((stats?.resolved_count ?? 0) + (stats?.closed_count ?? 0)) : 0}
+            value={user ? (stats?.resolved_count ?? 0) : 0}
             unit="Zadań"
             description="Zgłoszenia zakończone sukcesem"
           />
