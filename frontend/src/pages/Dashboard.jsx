@@ -174,7 +174,7 @@ export default function Dashboard() {
           </div>
           {/* recent activity */}
           <div className="lg:col-span-8 flex flex-col">
-            <RecentActivityCard items={activities} loading={loading} />
+            <RecentActivityCard items={activities} loading={loading} error={error} />
           </div>
           {/* campus map */}
           <div className="lg:col-span-4 relative h-full min-h-[400px]">

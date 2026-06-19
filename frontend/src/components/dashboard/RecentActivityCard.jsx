@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
 
-export default function RecentActivityCard({ items = [], loading = false }) {
+export default function RecentActivityCard({ items = [], loading = false, error = null }) {
   return (
     <div className="bg-surface border border-outline rounded-xl p-6 shadow-soft">
       {/* Header */}
@@ -26,6 +26,11 @@ export default function RecentActivityCard({ items = [], loading = false }) {
                  </div>
              </div>
            ))
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full text-error text-sm py-6 gap-2">
+             <span className="material-symbols-outlined text-2xl">warning</span>
+             <span>Nie udało się załadować aktywności.</span>
+          </div>
         ) : items.length === 0 ? (
            <div className="flex items-center justify-center h-full text-on-surface-variant text-sm py-6">
                Brak ostatnich aktywności.
