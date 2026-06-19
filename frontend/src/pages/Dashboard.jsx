@@ -90,6 +90,8 @@ export default function Dashboard() {
     };
     if (user) {
       fetchDashboardData();
+    }else{
+        setLoading(false);
     }
   }, [user]);
 
