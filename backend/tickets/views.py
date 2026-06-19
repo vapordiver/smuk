@@ -602,15 +602,15 @@ class StatsViewSet(viewsets.ViewSet):
             user_data = None
             if ticket.reporter:
                 user_data = {"first_name": ticket.reporter.first_name, "last_name": ticket.reporter.last_name}
-                combined_activity.append({
-                    "type": "ticket_created",
-                    "ticket_id": ticket.id,
-                    "ticket_title": ticket.title,
-                    "old_value": None,
-                    "new_value": ticket.status,
-                    "user": user_data,
-                    "timestamp": ticket.created_at
-                })
+            combined_activity.append({
+                "type": "ticket_created",
+                "ticket_id": ticket.id,
+                "ticket_title": ticket.title,
+                "old_value": None,
+                "new_value": ticket.status,
+                "user": user_data,
+                "timestamp": ticket.created_at
+            })
         combined_activity.sort(key=lambda x: x['timestamp'], reverse=True)
         top_activity = combined_activity[:5]
         for item in top_activity:
