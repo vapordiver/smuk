@@ -24,6 +24,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("users.urls")),
     path("api/", include("tickets.urls")),
+    path("api/", include("notifications.urls")),
 ]
 
 if settings.DEBUG and not settings.USE_S3:

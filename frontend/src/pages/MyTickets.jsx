@@ -1,4 +1,5 @@
 import {useState, useEffect, useMemo} from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {MapContainer, TileLayer, Marker} from 'react-leaflet';
 import {useAuth} from "../context/AuthContext";
 import 'leaflet/dist/leaflet.css';
@@ -400,6 +401,20 @@ export default function MyTickets() {
             isMounted = false;
         };
     }, [user, isCoordinator]);
+
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    useEffect(() => {
+        const ticketIdParam = searchParams.get('ticket');
+        if (ticketIdParam && tickets.length > 0) {
+            const ticketIdNum = parseInt(ticketIdParam, 10);
+            const found = tickets.find(t => t.id === ticketIdNum);
+            if (found) {
+                setSelectedTicket(found);
+            }
+            setSearchParams({}, { replace: true });
+        }
+    }, [searchParams, tickets, setSearchParams]);
 
 // Filter logic
     const filteredTickets = useMemo(() => {

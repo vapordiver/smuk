@@ -388,7 +388,8 @@ components:
               type: string
         message:
           type: string
-          example: "Status Twojego zgłoszenia zmieniony na: IN_PROGRESS"
+          example: "IN_PROGRESS"
+          description: "Wartość statusu ticketa. Frontend jest odpowiedzialny za tłumaczenie i formatowanie wiadomości wyświetlanej w powiadomieniu."
         is_read:
           type: boolean
         created_at:
@@ -1392,6 +1393,26 @@ paths:
                     items:
                       $ref: "#/components/schemas/Notification"
 
+  /api/notifications/read-all/:
+    patch:
+      tags: [Notifications]
+      summary: Oznacz wszystkie powiadomienia jako przeczytane
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Wszystkie powiadomienia oznaczone jako przeczytane
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "All notifications makred as read"
+                  updated_count:
+                    type: integer
+
   /api/notifications/{id}/read/:
     patch:
       tags: [Notifications]
@@ -1419,12 +1440,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                  is_read:
-                    type: boolean
+                $ref: "#/components/schemas/Notification"
 
   # ═══════════════════════════════════════════════════════
   # REPORTS

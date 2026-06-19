@@ -87,6 +87,15 @@ class AuditLogEntrySerializer(serializers.ModelSerializer):
 
         return data
 
+class TicketShortSerializer(serializers.ModelSerializer):
+    """
+    Mini-serializer to used in notification serializer   
+    to fetch {id, title} in accordance with API contract.
+    """
+
+    class Meta:
+        model = Ticket
+        fields = ["id", "title"]
 
 class ParentTicketShortSerializer(serializers.ModelSerializer):
     """
