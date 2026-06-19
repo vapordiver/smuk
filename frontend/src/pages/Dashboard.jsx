@@ -14,7 +14,6 @@ const formatTimeAgo = (dateString) => {
   if (diffInSeconds < 60) return 'Przed chwilą';
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min. temu`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} godz. temu`;
-  if (diffInSeconds < 172800) return 'Wczoraj';
   //date diff bigger than a day
   return date.toLocaleDateString('pl-PL');
 };
