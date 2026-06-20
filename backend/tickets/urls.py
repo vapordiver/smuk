@@ -1,12 +1,12 @@
-from .views import TicketViewSet, WeeklyReportListView
+from .views import TicketViewSet, WeeklyReportListView, BuildingsListView, FaultCategoriesListView, CampusListView, StatsViewSet
 from django.urls import path
-from .views import BuildingsListView, FaultCategoriesListView, CampusListView
 from rest_framework.routers import DefaultRouter
 from django.urls import include
 
 
 router = DefaultRouter()
 router.register(r"tickets", TicketViewSet, basename="ticket")
+router.register(r"stats", StatsViewSet, basename="stats")
 
 urlpatterns = [
     path("buildings/", BuildingsListView.as_view(), name="building-list"),

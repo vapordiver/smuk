@@ -21,7 +21,22 @@ export default function StatCard({
   value,
   unit,
   description,
+  loading = false,
 }) {
+  if(loading){
+    return (
+      <div className="bg-surface border border-outline rounded-xl p-6 shadow-soft h-full flex flex-col justify-between animate-pulse">
+        <div className="flex justify-between items-start mb-4">
+          <div className="w-8 h-8 bg-surface-variant rounded-full"></div>
+          <div className="w-20 h-5 bg-surface-variant rounded"></div>
+        </div>
+        <div>
+          <div className="w-16 h-10 bg-surface-variant rounded mb-2"></div>
+          <div className="w-3/4 h-4 bg-surface-variant rounded"></div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="bg-surface border border-outline rounded-xl p-6 shadow-soft transition-all duration-200 hover:shadow-lg hover:bg-surface-container-low hover:border-outline-variant h-full">
       {/* Top row: icon + badge */}

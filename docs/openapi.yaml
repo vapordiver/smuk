@@ -233,6 +233,22 @@ components:
         polygon:
           $ref: "#/components/schemas/GeoJSONPolygon"
 
+    # --- Parent Ticket Details (lista) ---
+    ParentTicketShort:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        image:
+          type: string
+          nullable: true
+          example: "http://backend:8000/media/tickets/2026/05/28/abc123.webp"
+        title:
+          type: string
+          example: "Główny problem: Pęknięta rura"
+
     # --- Ticket (lista) ---
     TicketListItem:
       type: object
@@ -278,6 +294,9 @@ components:
         created_at:
           type: string
           format: date-time
+        updated_at:
+          type: string
+          format: date-time
         audit_log:
           type: array
           description: |
@@ -285,6 +304,12 @@ components:
             zgodnie z implementacją `TicketListSerializer`.
           items:
             $ref: "#/components/schemas/AuditLogEntry"
+        parent_ticket:
+          type: integer
+          nullable: true
+          description: ID ticketa-rodzica (jeśli duplikat)
+        parent_details:
+          $ref: "#/components/schemas/ParentTicketShort"
 
     # --- Ticket (pełny) ---
     TicketDetail:
@@ -330,6 +355,8 @@ components:
           type: integer
           nullable: true
           description: ID ticketa-rodzica (jeśli duplikat)
+        parent_details:
+          $ref: "#/components/schemas/ParentTicketShort"
         created_at:
           type: string
           format: date-time
@@ -1568,3 +1595,4 @@ paths:
                 resolved_count: 1
                 closed_count: 6
                 needs_review_count: 0
+                open_count: 6
