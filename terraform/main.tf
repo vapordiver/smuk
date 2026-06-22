@@ -21,3 +21,33 @@ resource "aws_iam_user_access_key" "django_user_key" {
     user = aws_iam_user.django_user.name
 }
 
+# IAM policy
+data "aws_iam_policy_document" "s3_access_policy" {
+    statement {
+        effect = "Allow"
+        actions = [
+            "s3:ListBucket"
+        ]
+        resources = [
+            aws_s3_bucket.media_bucket.arn
+        ]
+    }
+
+    statement {
+        effect = "Allow"
+        actions = [
+            "s3:PutObject",
+            "s3:GetObject",
+            "s3:DeleteObject"
+        ]
+        resources = [
+            "${aws_s3_bucket.media_bucket.arn}/*"
+        ]
+    }
+}
+
+resource "aws_iam_user_policy" "django_worker_user_policy" {
+    name = "DjangoWorkerMediaPolicy"
+    user = aws_iam_user.django_user.name
+    policy = data.aws_iam_policy_document.s3_access_policy.json
+}
