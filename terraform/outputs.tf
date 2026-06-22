@@ -5,11 +5,11 @@ output "AWS_BUCKET_NAME" {
 
 output "AWS_ACCESS_KEY_ID" {
   description = "Django worker access key ID"
-  value       = aws_iam_user.django_user_key.id
+  value       = aws_iam_access_key.django_user_key.id
 }
 
 output "AWS_SECRET_ACCESS_KEY" {
   description = "Django worker secret access key"
-  value       = aws_iam_user.django_user_key.secret
+  value       = aws_iam_access_key.django_user_key.secret
   sensitive   = true
 }
