@@ -11,3 +11,13 @@ resource "aws_s3_bucket_public_access_block" "media_bucket_public_access" {
     restrict_public_buckets = true
 }
 
+# technical user for django
+resource "aws_iam_user" "django_user" {
+    name = var.iam_user_name
+}
+
+# credentials for technical user
+resource "aws_iam_user_access_key" "django_user_key" {
+    user = aws_iam_user.django_user.name
+}
+
