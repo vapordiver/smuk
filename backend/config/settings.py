@@ -227,6 +227,7 @@ if USE_S3:
 
     # boto3
     AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_ADDRESSING_STYLE = "virtual"
     AWS_S3_FILE_OVERWRITE = False
 
     # Pre-signed URLs
