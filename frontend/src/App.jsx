@@ -1,4 +1,4 @@
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useCallback} from 'react';
 import {BrowserRouter, Routes, Route, Outlet, useLocation} from 'react-router-dom';
 import {AuthProvider} from "./context/AuthContext";
 import {NotificationProvider} from './context/NotificationContext';
@@ -84,7 +84,7 @@ function Layout() {
         //listen for success on background sync from serviceworker (android chrome)
         const handleSWMessage = (event) => {
             if (event.data && event.data.type === 'SYNC_SUCCESS') {
-                showToast('success', `Wysłano ${successCount} zgłoszeń zapisanych offline.`);
+                showToast('success', `Wysłano ${event.data.count} zgłoszeń zapisanych offline.`);
             }
         };
         navigator.serviceWorker?.addEventListener('message', handleSWMessage);

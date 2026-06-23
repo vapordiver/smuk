@@ -23,8 +23,10 @@ async function syncTickets() {
   for (const ticket of tickets) {
     const formData = new FormData();
     formData.append('title', ticket.title);
-    formData.append('category_id', ticket.category_id);
-    if (ticket.building_id) formData.append('building_id', ticket.building_id);
+    formData.append('category_id', ticket.categoryId);
+    if (ticket.buildingId){
+        formData.append('building_id', ticket.buildingId);
+    }
     formData.append('description', ticket.description);
     formData.append('latitude', ticket.latitude);
     formData.append('longitude', ticket.longitude);
