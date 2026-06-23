@@ -10,7 +10,6 @@ import MyTickets from './pages/MyTickets';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CampusMap from './pages/CampusMap';
-import AdminPanel from './pages/AdminPanel';
 import ProfilePage from './pages/ProfilePage';
 import CoordinatorPanel from './pages/CoordinatorPanel';
 import ProtectedRoute from "./components/common/ProtectedRoute";
