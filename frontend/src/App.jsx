@@ -10,7 +10,6 @@ import MyTickets from './pages/MyTickets';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CampusMap from './pages/CampusMap';
-import ProfilePage from './pages/ProfilePage';
 import CoordinatorPanel from './pages/CoordinatorPanel';
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicRoute from "./components/common/PublicRoute.jsx";
@@ -170,7 +169,6 @@ export default function App() {
                             <Route element={<ProtectedRoute/>}>
                                 <Route path="/report" element={<ReportForm/>}/>
                                 <Route path="/my-tickets" element={<MyTickets/>}/>
-                                <Route path="/profile" element={<ProfilePage/>}/>
                             </Route>
                             <Route element={<ProtectedRoute allowedRoles={['coordinator']}/>}>
                                 <Route path="/admin" element={<CoordinatorPanel/>}/>
