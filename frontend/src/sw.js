@@ -21,9 +21,16 @@ async function syncTickets() {
     let successCount = 0;
 
     for (const ticket of tickets) {
-        // double-check if ticket still exists (prevent race with main app thread)
-        const exists = await db.get('pending-tickets', ticket.id);
-        if (!exists) continue;
+        // claim ticket atomically: read + delete in one transaction (prevents duplicate sends)
+        const tx = db.transaction('pending-tickets', 'readwrite');
+        const store = tx.objectStore('pending-tickets');
+        const exists = await store.get(ticket.id);
+        if (!exists) {
+            await tx.done;
+            continue;
+        }
+        await store.delete(ticket.id);
+        await tx.done;
 
         const formData = new FormData();
         formData.append('title', ticket.title);
@@ -46,8 +53,7 @@ async function syncTickets() {
             }
         } catch (blobErr) {
             console.error('Failed to convert base64 to blob in SW:', blobErr);
-            // remove corrupt ticket from queue to prevent infinite background sync loops
-            await db.delete('pending-tickets', ticket.id);
+            //ticket already deleted before send, corrupt blob = skip permanently
             continue;
         }
 
@@ -62,18 +68,19 @@ async function syncTickets() {
                 body: formData
             });
             if (res.ok) {
-                await db.delete('pending-tickets', ticket.id);
+                //ticket already deleted before send, just count
                 successCount++;
             } else if (res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 429) {
-                //validation error
-                await db.delete('pending-tickets', ticket.id);
+                //validation error, ticket already deleted, no restore needed
             } else {
-                //no retry storming in case of error 5xx, 401 or 429.
+                //re-queue ticket for retry on 5xx, 401 or 429
+                await db.put('pending-tickets', ticket);
                 break;
             }
         } catch (err) {
             console.error('Background sync error for the ticket: ', ticket.id, err);
-            //cancel and leave ticket in IndexedDB till next sync.
+            //re-queue ticket for next sync attempt
+            await db.put('pending-tickets', ticket);
             throw err;
         }
     }

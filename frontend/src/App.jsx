@@ -15,7 +15,7 @@ import ProfilePage from './pages/ProfilePage';
 import CoordinatorPanel from './pages/CoordinatorPanel';
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import Toast, {useToast} from "./components/common/Toast.jsx";
-import {getPendingTickets, deletePendingTicket} from "./services/db.js";
+import {getPendingTickets, claimPendingTicket, savePendingTicket} from "./services/db.js";
 import api from "./services/api"
 
 /**
@@ -51,6 +51,10 @@ function Layout() {
             }
             let successCount = 0;
             for (const ticket of tickets) {
+                //claim ticket atomically (prevents race with SW background sync)
+                const claimed = await claimPendingTicket(ticket.id);
+                if (!claimed) continue;
+
                 try {
                     const formData = new FormData();
                     formData.append('title', ticket.title);
@@ -89,15 +93,14 @@ function Layout() {
                         error.status = res.status;
                         throw error;
                     }
-                    //if success
-                    await deletePendingTicket(ticket.id);
+                    //ticket already deleted by claim, just count
                     successCount++;
                 } catch (err) {
                     console.error("Błąd wysyłki offline:", err);
                     showToast('error', `Błąd wysyłki: ${err.message}`);
-                    // if issue (400) - validation, geofencing or corrupt format, delete ticket from queue
-                    if (err.status === 400 || err.message.toLowerCase().includes("validation")) {
-                        await deletePendingTicket(ticket.id);
+                    //re-queue for retry unless validation error (400)
+                    if (err.status !== 400 && !err.message.toLowerCase().includes("validation")) {
+                        await savePendingTicket(ticket);
                     }
                 }
             }
@@ -125,7 +128,8 @@ function Layout() {
             navigator.serviceWorker?.addEventListener('message', handleSWMessage);
         }
 
-        // always listen to online event as fallback when background sync token expires (sw 401 issue)
+        //sync pending tickets on app open and when connection is restored
+        //race condition with SW prevented by atomic claimPendingTicket in both paths
         window.addEventListener('online', syncPending);
         if (navigator.onLine && isInitialMount.current) {
             isInitialMount.current = false;

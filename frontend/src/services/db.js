@@ -24,3 +24,16 @@ export async function deletePendingTicket(id) {
     const db = await initDB();
     return db.delete('pending-tickets', id);
 }
+
+//atomically read + delete ticket in one transaction (prevents duplicate sends)
+export async function claimPendingTicket(id) {
+    const db = await initDB();
+    const tx = db.transaction('pending-tickets', 'readwrite');
+    const store = tx.objectStore('pending-tickets');
+    const ticket = await store.get(id);
+    if (ticket) {
+        await store.delete(id);
+    }
+    await tx.done;
+    return ticket || null;
+}
