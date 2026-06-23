@@ -7,17 +7,21 @@ import api from '../services/api';
  */
 
 /* ── Chart helpers ── */
-const CATEGORY_COLORS = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-outline-variant'];
-const CATEGORY_HEX_COLORS = [
-  'var(--color-primary)',
-  'var(--color-secondary)',
-  'var(--color-tertiary)',
-  'var(--color-outline-variant)',
-  '#a78bfa',
-  '#34d399',
-  '#f97316',
-  '#e879f9',
-];
+const getCategoryColorsMap = (tickets) => {
+  const colorMap = new Map();
+  colorMap.set('Inne', '#94a3b8'); // Domyślny neutralny szary dla kategorii "Inne"
+
+  tickets.forEach((ticket) => {
+    const catName = ticket.category?.name || 'Inne';
+    const catColor = ticket.category?.color;
+    if (catColor && catName !== 'Inne') {
+      colorMap.set(catName, catColor);
+    }
+  });
+  return colorMap;
+};
+
+
 const MONTH_LABELS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
 const REPORTS_LIST = [
@@ -84,6 +88,7 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     };
   });
 
+  const catColorMap = getCategoryColorsMap(tickets);
   // Collect per-month category counts
   const monthCatCounts = new Map(months.map((m) => [m.key, new Map()]));
 
@@ -106,8 +111,11 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     });
   });
   const orderedCats = [...globalCatTotals.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([cat], idx) => ({ cat, color: CATEGORY_HEX_COLORS[idx % CATEGORY_HEX_COLORS.length] }));
+    .map(([cat]) => ({
+      cat,
+      color: catColorMap.get(cat) || '#94a3b8'
+    }))
+    .sort((a, b) => a.cat.localeCompare(b.cat));
 
   const totals = months.map((m) => {
     const catMap = monthCatCounts.get(m.key) || new Map();
@@ -121,12 +129,11 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     // Segments sorted from largest to smallest (will render bottom-to-top)
     const segments = orderedCats
       .map(({ cat, color }) => ({ cat, count: catMap.get(cat) || 0, color }))
-      .filter((s) => s.count > 0)
-      .sort((a, b) => b.count - a.count);
+      .filter((s) => s.count > 0);
     return {
       label: month.label,
       value: total,
-      heightPct: total === 0 ? 8 : Math.max(12, Math.round((total / maxValue) * 85)),
+      heightPct: total === 0 ? 8 : Math.max(12, Math.round((total / maxValue) * 100)),
       active: index === months.length - 1,
       segments,
       orderedCats,
@@ -136,30 +143,38 @@ const buildTrendData = (tickets, endDate = new Date()) => {
 
 const buildCategoryDist = (tickets) => {
   const counts = new Map();
+  const catColorMap = getCategoryColorsMap(tickets);
 
   tickets.forEach((ticket) => {
     const label = ticket.category?.name || 'Inne';
     counts.set(label, (counts.get(label) || 0) + 1);
   });
 
-  const sortedEntries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const sortedByCount = [...counts.entries()]
+    .filter(([label]) => label !== 'Inne')
+    .sort((a, b) => b[1] - a[1]);
 
-  if (sortedEntries.length === 0) {
-    return [];
+  if (sortedByCount.length === 0) {
+    const inneCount = counts.get('Inne') || 0;
+    return inneCount > 0 ? [{ label: 'Inne', pct: 100, color: '#94a3b8' }] : [];
   }
 
-  const topEntries = sortedEntries.slice(0, 3);
-  const remainingCount = sortedEntries.slice(3).reduce((sum, [, count]) => sum + count, 0);
+
+
+  const top3 = sortedByCount.slice(0, 3);
+  const remainingCount = sortedByCount.slice(3).reduce((sum, [, count]) => sum + count, 0) + (counts.get('Inne') || 0);
+  const stableTop3 = top3.sort((a, b) => a[0].localeCompare(b[0]));
+  const finalEntries = [...stableTop3];
   if (remainingCount > 0) {
-    topEntries.push(['Inne', remainingCount]);
+    finalEntries.push(['Inne', remainingCount]);
   }
 
   const total = tickets.length || 1;
 
-  return topEntries.map(([label, count], index) => ({
+  return finalEntries.map(([label, count]) => ({
     label,
     pct: Math.round((count / total) * 100),
-    color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+    color: catColorMap.get(label) || '#94a3b8',
   }));
 };
 
@@ -183,9 +198,9 @@ function BarChart({ data }) {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Chart area */}
-      <div className="flex-1 flex items-end justify-between gap-2 md:gap-6 pt-4 pb-2 border-b border-outline-variant relative">
+      <div className="flex-1 flex items-end justify-between gap-2 md:gap-6 border-b border-outline-variant relative">
         {/* Dashed guide lines */}
-        <div className="absolute left-0 top-0 h-full w-full flex flex-col justify-between pointer-events-none z-0">
+        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none z-0">
           <div className="border-b border-dashed border-outline-variant w-full h-0" />
           <div className="border-b border-dashed border-outline-variant w-full h-0" />
           <div className="border-b border-dashed border-outline-variant w-full h-0" />
@@ -199,11 +214,11 @@ function BarChart({ data }) {
                 bar.value > 0
                   ? bar.active
                     ? 'border-2 border-slate-800'
-                    : 'border-2 border-slate-800/30' // Poszarzone obramowanie dla nieaktywnych kolumn
+                    : 'border-2 border-slate-800/30'
                   : 'border border-outline-variant/30'
               }`}
               style={{ height: `${bar.heightPct}%` }}
-              title={bar.segments.map((s) => `${s.cat}: ${s.count}`).join('\n') || bar.label}
+              title={[...bar.segments].reverse().map((s) => `${s.cat}: ${s.count}`).join('\n') || bar.label}
             >
               {bar.value === 0 ? (
                 <div className="w-full h-full bg-outline-variant/10 rounded-t-sm" />
@@ -232,31 +247,22 @@ function BarChart({ data }) {
                 </div>
               )}
             </div>
-            <span
-              className={`text-xs font-medium mt-3 ${
-                bar.active ? 'text-primary font-bold' : 'text-on-surface-variant'
-              }`}
-            >
-              {bar.label}
-            </span>
           </div>
         ))}
       </div>
-
-      {/* Legend */}
-      {orderedCats.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-2">
-          {orderedCats.map(({ cat, color }) => (
-            <div key={cat} className="flex items-center gap-1.5">
-              <div
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-[11px] text-on-surface-variant font-medium">{cat}</span>
-            </div>
-          ))}
-        </div>
-      )}
+        {/*bar Labels*/}
+      <div className="flex justify-between gap-2 md:gap-6 mt-3 shrink-0">
+        {data.map((bar) => (
+          <span
+            key={bar.label}
+            className={`text-xs font-medium w-full text-center ${
+              bar.active ? 'text-primary font-bold' : 'text-on-surface-variant'
+            }`}
+          >
+            {bar.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -264,7 +270,10 @@ function BarChart({ data }) {
 function CategoryRow({ label, pct, color }) {
   return (
     <div className="flex items-center gap-3">
-      <div className={`w-3 h-3 rounded-full shrink-0 ${color}`} />
+      <div
+        className="w-3 h-3 rounded-full shrink-0"
+        style={{ backgroundColor: color }}
+      />
       <span className="flex-1 text-sm font-medium text-on-surface">{label}</span>
       <span className="text-sm font-bold text-on-surface">{pct}%</span>
     </div>
@@ -825,8 +834,11 @@ export default function CoordinatorPanel() {
                   {categoryData.map((cat) => (
                     <div
                       key={cat.label}
-                      className={`h-full ${cat.color}`}
-                      style={{ width: `${cat.pct}%` }}
+                      className="h-full"
+                      style={{
+                        width: `${cat.pct}%`,
+                        backgroundColor: cat.color
+                      }}
                     />
                   ))}
                 </div>
@@ -880,12 +892,12 @@ export default function CoordinatorPanel() {
             </div>
 
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              <select 
-                value={statusFilter} 
+              <select
+                value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
-                }} 
+                }}
                 className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Status: Wszystkie</option>
@@ -894,12 +906,12 @@ export default function CoordinatorPanel() {
                 <option value="RESOLVED">Rozwiązane</option>
                 <option value="CLOSED">Zamknięte</option>
               </select>
-              <select 
-                value={priorityFilter} 
+              <select
+                value={priorityFilter}
                 onChange={(e) => {
                   setPriorityFilter(e.target.value);
                   setCurrentPage(1);
-                }} 
+                }}
                 className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Priorytet: Wszystkie</option>
@@ -908,12 +920,12 @@ export default function CoordinatorPanel() {
                 <option value="HIGH">Wysokie</option>
                 <option value="CRITICAL">Krytyczne</option>
               </select>
-              <select 
-                value={sortPriority} 
+              <select
+                value={sortPriority}
                 onChange={(e) => {
                   setSortPriority(e.target.value);
                   setCurrentPage(1);
-                }} 
+                }}
                 className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Sortuj: Domyślnie</option>
@@ -934,22 +946,22 @@ export default function CoordinatorPanel() {
                 {tickets.map((ticket) => (
                   <TicketRow key={ticket.id} ticket={ticket} coordinators={coordinators} onTicketUpdated={handleTicketUpdated} />
                 ))}
-                
+
                 {/* ── Pagination Footer ── */}
                 <div className="mt-8 pt-6 border-t border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-4">
                   <p className="text-sm text-on-surface-variant">
                     Pokazano <span className="font-bold text-on-surface">{Math.min(totalCount, (currentPage - 1) * pageSize + 1)} - {Math.min(totalCount, currentPage * pageSize)}</span> z <span className="font-bold text-on-surface">{totalCount}</span> zgłoszeń
                   </p>
-                  
+
                   <div className="flex items-center gap-1">
-                    <button 
+                    <button
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1 || isLoading}
                       className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline hover:bg-surface-container transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
                     >
                       <span className="material-symbols-outlined">chevron_left</span>
                     </button>
-                    
+
                     {[...Array(totalPages)].map((_, i) => {
                         const pageNum = i + 1;
                         // Simple logic to show only some pages if too many
@@ -957,7 +969,7 @@ export default function CoordinatorPanel() {
                             if (pageNum === 3 || pageNum === totalPages - 2) return <span key={pageNum} className="px-2">...</span>;
                             return null;
                         }
-                        
+
                         return (
                           <button
                             key={pageNum}
@@ -972,8 +984,8 @@ export default function CoordinatorPanel() {
                           </button>
                         );
                     })}
-                    
-                    <button 
+
+                    <button
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages || totalPages === 0 || isLoading}
                       className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline hover:bg-surface-container transition-colors disabled:opacity-30 disabled:hover:bg-transparent"

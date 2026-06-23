@@ -5,7 +5,7 @@
         "fields": {
             "name": "Instalacja wodna",
             "icon": "💧",
-            "color": "#2196F3"
+            "color": "#022BCF"
         }
     },
     {
@@ -14,7 +14,7 @@
         "fields": {
             "name": "Elektryka",
             "icon": "⚡",
-            "color": "#FFEB3B"
+            "color": "#E0B000"
         }
     },
     {
@@ -23,7 +23,7 @@
         "fields": {
             "name": "Ogrzewanie",
             "icon": "🔥",
-            "color": "#FF5722"
+            "color": "#8C1800"
         }
     }
 ]
