@@ -171,10 +171,14 @@ export default function ReportForm() {
                     token: localStorage.getItem('accessToken')
                 };
                 await savePendingTicket(pendingTicket);
-                //background sync for android
-                if('serviceWorker' in navigator && 'SyncManager' in window){
-                    const registration = await navigator.serviceWorker.ready;
-                    await registration.sync.register('sync-tickets');
+                //background sync for android (separate try-catch, ticket is already saved above)
+                try {
+                    if('serviceWorker' in navigator && 'SyncManager' in window){
+                        const registration = await navigator.serviceWorker.ready;
+                        await registration.sync.register('sync-tickets');
+                    }
+                } catch (syncErr) {
+                    console.warn('Background sync registration failed, will sync on next online event:', syncErr);
                 }
                 setSubmitted(true);
                 showToast('success', 'Brak internetu. Zgłoszenie zapisane offline. Zostanie wysłane po odzyskaniu połączenia.');
