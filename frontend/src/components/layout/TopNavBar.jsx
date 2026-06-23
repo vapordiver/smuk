@@ -82,15 +82,6 @@ export default function TopNavBar({ onToggleSidebar }) {
                         <span className="material-symbols-outlined text-[24px]">logout</span>
                     </button>
                 )}
-
-                {/* User avatar */}
-                <Link
-                    to={isAuthenticated ? '/profile' : '/login'}
-                    className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-full transition-colors cursor-pointer shrink-0"
-                    aria-label="Profil"
-                >
-                    <span className="material-symbols-outlined text-[24px]">account_circle</span>
-                </Link>
             </div>
         </header>
     );
