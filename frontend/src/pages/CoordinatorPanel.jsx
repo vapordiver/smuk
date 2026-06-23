@@ -543,8 +543,9 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                  return (
                    <div key={log.id} className="relative pl-3 sm:pl-4">
                      <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-primary/40 border-2 border-surface" />
+                       {/* render SYSTEM if user null */}
                      <div className="text-[11px] sm:text-xs font-medium text-on-surface-variant mb-0.5">
-                       {formatDate(log.created_at)} • {log.user?.first_name} {log.user?.last_name}
+                       {formatDate(log.created_at)} • {log.user ? `${log.user.first_name} ${log.user.last_name}` : 'SYSTEM'}
                      </div>
                      <div className="text-[13px] sm:text-sm text-on-surface font-semibold">{display.title}</div>
                      <div className="text-[11px] sm:text-xs text-on-surface-variant mt-1 p-2 bg-surface-container rounded-lg border border-outline">
@@ -557,7 +558,6 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                )}
              </div>
           </div>
-
           {ticket.status === 'CLOSED' && (
               <div className="mt-2 pt-3 sm:pt-4 border-t border-outline-variant text-[13px] sm:text-sm text-on-surface-variant italic text-center">
                   Zgłoszenie jest zamknięte i nie można go już edytować.

@@ -325,8 +325,9 @@ const TicketModal = ({ticket, onClose}) => {
                                             {formatDate(entry.created_at)}
                                         </div>
                                         <div>
+                                            {/* render SYSTEM if user null */}
                                             <span className="font-medium text-slate-700">
-                                                {entry.user?.first_name} {entry.user?.last_name}
+                                                {entry.user ? `${entry.user.first_name} ${entry.user.last_name}` : 'SYSTEM'}
                                             </span>
                                             <span className="text-slate-500"> zmienił(a) </span>
                                             <span
