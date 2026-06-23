@@ -224,8 +224,8 @@ class TicketCreateSerializer(serializers.Serializer):
         point = Point(lng, lat, srid=4326)
 
         # geofencing: check if location is within campus boundaries
-        # 0.0005 means around 50-60meters
-        inside_campus = Campus.objects.filter(polygon__dwithin=(point, 0.0005)).exists()
+        # 0.0005 = ~(50 to 60)m
+        is_on_campus = Campus.objects.filter(polygon__dwithin=(point, 0.0005)).exists()
 
         if not is_on_campus:
             raise serializers.ValidationError({
