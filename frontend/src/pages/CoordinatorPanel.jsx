@@ -668,11 +668,11 @@ export default function CoordinatorPanel() {
     setIsChartLoading(true);
     try {
       const baseDate = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date();
-      const endDate = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date();
+      const endDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + chartShiftMonths, 1);
       const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 5, 1);
 
       const startStr = getFirstDayOfMonth(startDate.getFullYear(), startDate.getMonth() + 1);
-      const endStr = dateTo || getLastDayOfMonth(endDate.getFullYear(), endDate.getMonth() + 1);
+      const endStr = getLastDayOfMonth(endDate.getFullYear(), endDate.getMonth() + 1);
 
       const params = new URLSearchParams();
       if (statusFilter) params.append('status', statusFilter);
@@ -717,7 +717,7 @@ export default function CoordinatorPanel() {
     } finally {
       setIsChartLoading(false);
     }
-  }, [dateTo, priorityFilter, statusFilter]);
+  }, [chartShiftMonths, dateTo, priorityFilter, statusFilter]);
 
   useEffect(() => {
       fetchTickets();
@@ -753,6 +753,7 @@ export default function CoordinatorPanel() {
 
     setDateFrom(getFirstDayOfMonth(year, month));
     setDateTo(getLastDayOfMonth(year, month));
+    setChartShiftMonths(0);
     setCurrentPage(1);
   };
 
@@ -762,7 +763,11 @@ export default function CoordinatorPanel() {
     if (dateTo && report.generatedOn > dateTo) return false;
     return true;
   });
-  const trendData = buildTrendData(chartTickets, dateFrom, dateTo, dateTo ? new Date(`${dateTo}T00:00:00`) : new Date());
+
+  const baseChartEndDate = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date();
+  const shiftedEndDate = new Date(baseChartEndDate.getFullYear(), baseChartEndDate.getMonth() + chartShiftMonths, 1);
+  const trendData = buildTrendData(chartTickets, dateFrom, dateTo, shiftedEndDate);
+  // Filter category distribution client-side based on active dateFrom/dateTo range
   const activeTickets = chartTickets.filter((ticket) => {
     if (!ticket.created_at) return false;
     const tDate = ticket.created_at.slice(0, 10); // Format YYYY-MM-DD
@@ -798,6 +803,7 @@ export default function CoordinatorPanel() {
                 max={dateTo || undefined}
                 onChange={(e) => {
                   setDateFrom(e.target.value);
+                  setChartShiftMonths(0); // Reset shift on manual date change
                   setCurrentPage(1);
                 }}
                 className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
@@ -813,6 +819,7 @@ export default function CoordinatorPanel() {
                 min={dateFrom || undefined}
                 onChange={(e) => {
                   setDateTo(e.target.value);
+                  setChartShiftMonths(0); // Reset shift on manual date change
                   setCurrentPage(1);
                 }}
                 className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
@@ -821,12 +828,12 @@ export default function CoordinatorPanel() {
             <div className="flex items-end">
               <button
                 onClick={() => {
-                  //default month selection
                   const now = new Date();
                   const y = now.getFullYear();
                   const m = now.getMonth() + 1;
                   setDateFrom(getFirstDayOfMonth(y, m));
                   setDateTo(getLastDayOfMonth(y, m));
+                  setChartShiftMonths(0); // Reset shift on manual reset
                   setCurrentPage(1);
                 }}
                 className="px-4 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors whitespace-nowrap"
@@ -842,35 +849,68 @@ export default function CoordinatorPanel() {
         {/* Visualization bento */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Trend chart (2/3 width) */}
-          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[26rem] sm:min-h-[32rem]">
+          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[26rem] sm:min-h-[32rem] relative">
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface leading-tight">
                 Trend Zgłoszeń (Ostatnie 6 miesięcy)
               </h2>
             </div>
-            {isChartLoading ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
-                Ładowanie wykresu...
+            {/* loading indicator in the top right corner */}
+            {isChartLoading && trendData.length > 0 && (
+              <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-surface-container/80 backdrop-blur-sm px-2.5 py-1 rounded-full border border-outline text-[11px] font-bold text-on-surface-variant animate-pulse shadow-sm">
+                <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                Loading...
+              </div>
+            )}
+            {isChartLoading && trendData.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant animate-pulse gap-2">
+                <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                Loading chart...
               </div>
             ) : trendData.length > 0 ? (
-              <BarChart data={trendData} onBarClick={handleBarClick} />
+              // smooth fading while loading
+              <div className={`relative flex-1 flex flex-col px-4 transition-all duration-300 ${isChartLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                <button
+                  onClick={() => setChartShiftMonths(prev => prev - 1)}
+                  disabled={isChartLoading}
+                  className="absolute left-[-12px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  title="Poprzedni miesiąc"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                </button>
+
+                <BarChart data={trendData} onBarClick={handleBarClick} />
+
+                <button
+                  onClick={() => setChartShiftMonths(prev => prev + 1)}
+                  disabled={isChartLoading}
+                  className="absolute right-[-12px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  title="Następny miesiąc"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
                 Brak danych do wyświetlenia.
               </div>
             )}
           </div>
+
           {/* Category distribution (1/3 width) */}
-          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[18rem] lg:min-h-[32rem]">
+          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[18rem] lg:min-h-[32rem] relative">
             <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface mb-4 sm:mb-6 leading-tight">
               Dystrybucja Kategorii
             </h2>
-            {isChartLoading ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
-                Ładowanie wykresu...
+
+            {isChartLoading && categoryData.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant animate-pulse gap-2">
+                <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                Loading...
               </div>
             ) : categoryData.length > 0 ? (
-              <div className="flex-1 flex flex-col justify-center gap-4">
+              // smooth fading while loading
+              <div className={`flex-1 flex flex-col justify-center gap-4 transition-all duration-300 ${isChartLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                 {categoryData.slice().reverse().map((cat) => (
                   <CategoryRow key={cat.label} {...cat} />
                 ))}
