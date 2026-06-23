@@ -14,6 +14,7 @@ import AdminPanel from './pages/AdminPanel';
 import ProfilePage from './pages/ProfilePage';
 import CoordinatorPanel from './pages/CoordinatorPanel';
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import PublicRoute from "./components/common/PublicRoute.jsx";
 import Toast, {useToast} from "./components/common/Toast.jsx";
 import {getPendingTickets, deletePendingTicket} from "./services/db.js";
 import api from "./services/api"
@@ -176,9 +177,10 @@ export default function App() {
                                 <Route path="/admin" element={<CoordinatorPanel/>}/>
                             </Route>
                         </Route>
-                        {/* Auth routes – no sidebar */}
-                        <Route path="/login" element={<Login/>}/>
-                        <Route path="/register" element={<Register/>}/>
+                        <Route element={<PublicRoute/>}>
+                            <Route path="/login" element={<Login/>}/>
+                            <Route path="/register" element={<Register/>}/>
+                        </Route>
                     </Routes>
                 </BrowserRouter>
             </NotificationProvider>
