@@ -13,6 +13,7 @@
     "@fontsource-variable/lexend": "^5.2.11",
     "@tailwindcss/postcss": "^4.2.2",
     "axios": "^1.13.6",
+    "idb": "^8.0.3",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
     "react": "^18.2.0",
@@ -35,6 +36,7 @@
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2",
     "vite": "^6.0.0",
-    "vite-plugin-pwa": "^1.1.0"
+    "vite-plugin-pwa": "^1.1.0",
+    "workbox-precaching": "^7.3.0"
   }
 }
