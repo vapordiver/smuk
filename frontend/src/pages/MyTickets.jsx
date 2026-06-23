@@ -288,7 +288,7 @@ const TicketModal = ({ticket, onClose}) => {
                             Lokalizacja
                         </h4>
                         <div className="text-slate-600 space-y-1">
-                            <p><strong>Budynek:</strong> {ticket.building?.name || "Okolice kampusu"}</p>
+                            <p><strong>Budynek:</strong> {ticket.building?.name || "Teren kampusu"}</p>
                             {ticket.floor && <p><strong>Piętro:</strong> {ticket.floor}</p>}
                             {ticket.room && <p><strong>Pokój:</strong> {ticket.room}</p>}
                         </div>
