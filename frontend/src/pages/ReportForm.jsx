@@ -206,6 +206,7 @@ export default function ReportForm() {
       setTimeout(() => navigate('/my-tickets'), 2000);
     } catch (err) {
       showToast('error', 'Wystąpił błąd podczas podpinania zgłoszenia.');
+      console.log('Error occurred: ',err);
     }
   };
 
