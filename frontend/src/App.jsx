@@ -37,7 +37,7 @@ function Layout() {
         setSidebarOpen(false);
     }, [location]);
 
-    //fallback : manual synchronization for iOS safari after user is back online
+//fallback : manual synchronization for iOS safari after user is back online
     const syncPending = useCallback(async () => {
         if (isSyncingRef.current) {
             return;
@@ -84,7 +84,10 @@ function Layout() {
                     if (!res.ok) {
                         const errData = await res.json().catch(() => ({}));
                         const errorMsg = errData?.error?.message || errData?.detail || `Kod błędu: ${res.status}`;
-                        throw new Error(errorMsg);
+                        const error = new Error(errorMsg);
+                        //attach http status code to error object
+                        error.status = res.status;
+                        throw error;
                     }
                     //if success
                     await deletePendingTicket(ticket.id);
@@ -92,8 +95,8 @@ function Layout() {
                 } catch (err) {
                     console.error("Błąd wysyłki offline:", err);
                     showToast('error', `Błąd wysyłki: ${err.message}`);
-                    // if issue (400) - validation or geofencing, delete ticket from queue
-                    if (err.message.includes("400") || err.message.toLowerCase().includes("validation")) {
+                    // if issue (400) - validation, geofencing or corrupt format, delete ticket from queue
+                    if (err.status === 400 || err.message.toLowerCase().includes("validation")) {
                         await deletePendingTicket(ticket.id);
                     }
                 }
@@ -111,27 +114,27 @@ function Layout() {
     //events for iOS ssafari (on open/refresh app)
     useEffect(() => {
         const supportsBackgroundSync = 'serviceWorker' in navigator && 'SyncManager' in window;
-        //if android == only run service worker (syncmanacger)
-        //block manual synchro to stop 429 from happening
+
+        let handleSWMessage;
         if (supportsBackgroundSync) {
-            const handleSWMessage = (event) => {
+            handleSWMessage = (event) => {
                 if (event.data && event.data.type === 'SYNC_SUCCESS') {
                     showToast('success', `Wysłano ${event.data.count} zgłoszeń zapisanych offline.`);
                 }
             };
             navigator.serviceWorker?.addEventListener('message', handleSWMessage);
-            return () => {
-                navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
-            };
         }
 
-        //ios safari (no support for syncmanager)
+        // always listen to online event as fallback when background sync token expires (sw 401 issue)
         window.addEventListener('online', syncPending);
         if (navigator.onLine && isInitialMount.current) {
             isInitialMount.current = false;
             syncPending();
         }
         return () => {
+            if (supportsBackgroundSync && handleSWMessage) {
+                navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
+            }
             window.removeEventListener('online', syncPending);
         };
     }, [syncPending, showToast]);
