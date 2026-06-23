@@ -1,7 +1,7 @@
 import {useState, useEffect} from 'react';
 import {BrowserRouter, Routes, Route, Outlet, useLocation} from 'react-router-dom';
 import {AuthProvider} from "./context/AuthContext";
-import { NotificationProvider } from './context/NotificationContext';
+import {NotificationProvider} from './context/NotificationContext';
 import TopNavBar from './components/layout/TopNavBar';
 import SideNavBar from './components/layout/SideNavBar';
 import Dashboard from './pages/Dashboard';
@@ -25,14 +25,79 @@ import api from "./services/api"
 function Layout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const location = useLocation();
+    const {toast, showToast} = useToast();
 
     // Auto-close sidebar on route change
     useEffect(() => {
         setSidebarOpen(false);
     }, [location]);
 
+    //fallback : manual synchronization for iOS safari after user is back online
+    const syncPending = useCallback(async () => {
+        try {
+            const tickets = await getPendingTickets();
+            if (!tickets || tickets.length === 0) {
+                return;
+            }
+            let successCount = 0;
+            for (const ticket of tickets) {
+                const formData = new FormData();
+                formData.append('title', ticket.title);
+                formData.append('category_id', ticket.category_id);
+                if (ticket.building_id) formData.append('building_id', ticket.building_id);
+                formData.append('description', ticket.description);
+                formData.append('latitude', ticket.latitude);
+                formData.append('longitude', ticket.longitude);
+                formData.append('image', ticket.image);
+                try {
+                    //force authorization with saved token
+                    const res = await api.post('/tickets/', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                            'Authorization': `Bearer ${ticket.token}`
+                        }
+                    });
+                    await deletePendingTicket(ticket.id);
+                    successCount++;
+                } catch (err) {
+                    //delete only if success, validation error or error in function logic / web error doesnt delete from 'queue'
+                    if (err.response && err.response.status >= 400 && err.response.status < 500 && err.response.status !== 401 && err.response.status !== 429) {
+                        await deletePendingTicket(ticket.id);
+                    }
+                }
+            }
+            if (successCount > 0) {
+                showToast('success', `Wysłano ${successCount} zgłoszeń zapisanych offline.`);
+            }
+        } catch (error) {
+            console.error("Error during manual synchronization", error);
+        }
+    }, [showToast]);
+
+    //events for iOS ssafari (on open/refresh app)
+    useEffect(() => {
+        window.addEventListener('online', syncPending);
+        //exec immediately
+        if (navigator.onLine) {
+            syncPending();
+        }
+        //listen for success on background sync from serviceworker (android chrome)
+        const handleSWMessage = (event) => {
+            if (event.data && event.data.type === 'SYNC_SUCCESS') {
+                showToast('success', `Wysłano ${successCount} zgłoszeń zapisanych offline.`);
+            }
+        };
+        navigator.serviceWorker?.addEventListener('message', handleSWMessage);
+
+        return () => {
+            window.removeEventListener('online', syncPending);
+            navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
+        }
+    }, [syncPending, showToast]);
+
     return (
         <div className="min-h-screen bg-background text-on-background antialiased">
+            <Toast {...toast}/>
             <TopNavBar onToggleSidebar={() => setSidebarOpen((prev) => !prev)}/>
             <div className="flex h-[calc(100vh-4rem)]">
                 <SideNavBar
