@@ -193,22 +193,30 @@ function BarChart({ data }) {
 
         {data.map((bar) => (
           <div key={bar.label} className="flex flex-col items-center justify-end w-full h-full z-10">
-            {/* Stacked bar */}
+            {/* Stacked bar with border */}
             <div
-              className="w-full rounded-t-md overflow-hidden relative flex flex-col-reverse"
+              className={`w-full rounded-t-md relative flex flex-col-reverse ${
+                bar.value > 0
+                  ? bar.active
+                    ? 'border-2 border-slate-800'
+                    : 'border-2 border-slate-800/30' // Poszarzone obramowanie dla nieaktywnych kolumn
+                  : 'border border-outline-variant/30'
+              }`}
               style={{ height: `${bar.heightPct}%` }}
               title={bar.segments.map((s) => `${s.cat}: ${s.count}`).join('\n') || bar.label}
             >
               {bar.value === 0 ? (
-                <div className="w-full h-full bg-outline-variant/20 rounded-t-md" />
+                <div className="w-full h-full bg-outline-variant/10 rounded-t-sm" />
               ) : (
-                bar.segments.map((seg) => (
+                bar.segments.map((seg, index) => (
                   <div
                     key={seg.cat}
-                    className="w-full shrink-0"
+                    className={`w-full ${
+                      index === bar.segments.length - 1 ? 'rounded-t-sm' : ''
+                    } ${index > 0 ? 'border-b-2 border-slate-800' : ''}`}
                     style={{
-                      height: `${Math.round((seg.count / bar.value) * 100)}%`,
-                      minHeight: seg.count > 0 ? '4px' : '0',
+                      flex: `${seg.count} 1 auto`,
+                      minHeight: seg.count > 0 ? '5px' : '0',
                       backgroundColor: seg.color,
                       opacity: bar.active ? 1 : 0.55,
                     }}
@@ -779,7 +787,7 @@ export default function CoordinatorPanel() {
         {/* ── Visualization bento ── */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Trend chart (2/3 width) */}
-          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[22rem] sm:min-h-[26rem]">
+          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[26rem] sm:min-h-[32rem]">
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface leading-tight">
                 Trend Zgłoszeń (Ostatnie 6 miesięcy)
@@ -799,7 +807,7 @@ export default function CoordinatorPanel() {
           </div>
 
           {/* Category distribution (1/3 width) */}
-          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[22rem] sm:min-h-[26rem]">
+          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[26rem] sm:min-h-[32rem]">
             <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface mb-4 sm:mb-6 leading-tight">
               Dystrybucja Kategorii
             </h2>
