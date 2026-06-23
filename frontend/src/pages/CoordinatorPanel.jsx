@@ -7,9 +7,10 @@ import api from '../services/api';
  */
 
 /* ── Chart helpers ── */
+// Category colors map
 const getCategoryColorsMap = (tickets) => {
   const colorMap = new Map();
-  colorMap.set('Inne', '#94a3b8'); // Domyślny neutralny szary dla kategorii "Inne"
+  colorMap.set('Inne', '#94a3b8'); // Default fallback color
 
   tickets.forEach((ticket) => {
     const catName = ticket.category?.name || 'Inne';
@@ -21,9 +22,21 @@ const getCategoryColorsMap = (tickets) => {
   return colorMap;
 };
 
+// Helper functions for date operations
+const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const getFirstDayOfMonth = (year, month) => {
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+};
+
+const getLastDayOfMonth = (year, month) => {
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+};
 
 const MONTH_LABELS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
+//mockup - delete later
 const REPORTS_LIST = [
   {
     id: 1,
@@ -59,8 +72,6 @@ const PRIORITY_MAP = {
   CRITICAL: { label: 'Krytyczny', color: 'text-error font-bold' }
 };
 
-// Removed MOCK_COORDINATORS
-
 const formatDate = (isoString) => {
     if (!isoString) return '—';
     return new Date(isoString).toLocaleDateString('pl-PL', {
@@ -72,14 +83,12 @@ const formatDate = (isoString) => {
     });
 };
 
-const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
 const getMonthLabel = (date) => {
   const month = MONTH_LABELS_PL[date.getMonth()] || '';
   return month ? month.charAt(0).toUpperCase() + month.slice(1) : '';
 };
 
-const buildTrendData = (tickets, endDate = new Date()) => {
+const buildTrendData = (tickets, dateFromStr, dateToStr, endDate = new Date()) => {
   const months = Array.from({ length: 6 }, (_, index) => {
     const monthDate = new Date(endDate.getFullYear(), endDate.getMonth() - 5 + index, 1);
     return {
@@ -103,7 +112,7 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     catMap.set(catLabel, (catMap.get(catLabel) || 0) + 1);
   });
 
-  // Build a global ordered category list (by total count descending)
+  // Build global ordered category list alphabetically
   const globalCatTotals = new Map();
   monthCatCounts.forEach((catMap) => {
     catMap.forEach((count, cat) => {
@@ -123,18 +132,24 @@ const buildTrendData = (tickets, endDate = new Date()) => {
   });
   const maxValue = Math.max(...totals, 1);
 
+  const startLimit = dateFromStr ? dateFromStr.slice(0, 7) : '';
+  const endLimit = dateToStr ? dateToStr.slice(0, 7) : '';
+
   return months.map((month, index) => {
     const catMap = monthCatCounts.get(month.key) || new Map();
     const total = totals[index];
-    // Segments sorted from largest to smallest (will render bottom-to-top)
     const segments = orderedCats
       .map(({ cat, color }) => ({ cat, count: catMap.get(cat) || 0, color }))
       .filter((s) => s.count > 0);
+
+    const isActive = (!startLimit || month.key >= startLimit) && (!endLimit || month.key <= endLimit);
+
     return {
+      key: month.key,
       label: month.label,
       value: total,
       heightPct: total === 0 ? 8 : Math.max(12, Math.round((total / maxValue) * 100)),
-      active: index === months.length - 1,
+      active: isActive,
       segments,
       orderedCats,
     };
@@ -158,8 +173,6 @@ const buildCategoryDist = (tickets) => {
     const inneCount = counts.get('Inne') || 0;
     return inneCount > 0 ? [{ label: 'Inne', pct: 100, color: '#94a3b8' }] : [];
   }
-
-
 
   const top3 = sortedByCount.slice(0, 3);
   const remainingCount = sortedByCount.slice(3).reduce((sum, [, count]) => sum + count, 0) + (counts.get('Inne') || 0);
@@ -191,10 +204,7 @@ const createBaseTicketParams = ({ statusFilter, priorityFilter, dateFrom, dateTo
 
 /* ── Sub-components ── */
 
-function BarChart({ data }) {
-  // Collect legend from the last bar that has orderedCats (all bars share the same list)
-  const orderedCats = data.find((b) => b.orderedCats?.length > 0)?.orderedCats || [];
-
+function BarChart({ data, onBarClick }) {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Chart area */}
@@ -207,10 +217,14 @@ function BarChart({ data }) {
         </div>
 
         {data.map((bar) => (
-          <div key={bar.label} className="flex flex-col items-center justify-end w-full h-full z-10">
+          <div
+            key={bar.label}
+            className="flex flex-col items-center justify-end w-full h-full z-10 cursor-pointer group/bar"
+            onClick={() => onBarClick && onBarClick(bar)}
+          >
             {/* Stacked bar with border */}
             <div
-              className={`w-full rounded-t-md relative flex flex-col-reverse ${
+              className={`w-full rounded-t-md relative flex flex-col-reverse transition-all duration-200 group-hover/bar:scale-[1.02] ${
                 bar.value > 0
                   ? bar.active
                     ? 'border-2 border-slate-800'
@@ -250,12 +264,12 @@ function BarChart({ data }) {
           </div>
         ))}
       </div>
-        {/*bar Labels*/}
+      {/* bar Labels */}
       <div className="flex justify-between gap-2 md:gap-6 mt-3 shrink-0">
         {data.map((bar) => (
           <span
             key={bar.label}
-            className={`text-xs font-medium w-full text-center ${
+            className={`text-xs font-medium w-full text-center transition-colors duration-200 ${
               bar.active ? 'text-primary font-bold' : 'text-on-surface-variant'
             }`}
           >
@@ -604,8 +618,13 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
 
 /* ── Main page ── */
 export default function CoordinatorPanel() {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonthNum = today.getMonth() + 1;
+
+  const [dateFrom, setDateFrom] = useState(getFirstDayOfMonth(currentYear, currentMonthNum));
+  const [dateTo, setDateTo] = useState(getLastDayOfMonth(currentYear, currentMonthNum));
+  const [chartShiftMonths, setChartShiftMonths] = useState(0);
   const [tickets, setTickets] = useState([]);
   const [chartTickets, setChartTickets] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
@@ -615,7 +634,7 @@ export default function CoordinatorPanel() {
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 10;
 
-  // Filtry do sekcji biletów
+  // Ticket filters
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sortPriority, setSortPriority] = useState('');
@@ -643,12 +662,23 @@ export default function CoordinatorPanel() {
     } finally {
         setIsLoading(false);
     }
-      }, [currentPage, dateFrom, dateTo, priorityFilter, sortPriority, statusFilter]);
+  }, [currentPage, dateFrom, dateTo, priorityFilter, sortPriority, statusFilter]);
 
   const fetchChartTickets = useCallback(async () => {
     setIsChartLoading(true);
     try {
-      const params = createBaseTicketParams({ statusFilter, priorityFilter, dateFrom, dateTo });
+      const baseDate = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date();
+      const endDate = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date();
+      const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 5, 1);
+
+      const startStr = getFirstDayOfMonth(startDate.getFullYear(), startDate.getMonth() + 1);
+      const endStr = dateTo || getLastDayOfMonth(endDate.getFullYear(), endDate.getMonth() + 1);
+
+      const params = new URLSearchParams();
+      if (statusFilter) params.append('status', statusFilter);
+      if (priorityFilter) params.append('priority', priorityFilter);
+      params.append('date_from', startStr);
+      params.append('date_to', endStr);
       params.set('limit', '1000');
       params.set('offset', '0');
       params.set('ordering', '-created_at');
@@ -663,7 +693,11 @@ export default function CoordinatorPanel() {
         const allResults = [...results];
 
         for (let pageIndex = 1; pageIndex < totalPages; pageIndex += 1) {
-          const pageParams = createBaseTicketParams({ statusFilter, priorityFilter, dateFrom, dateTo });
+          const pageParams = new URLSearchParams();
+          if (statusFilter) pageParams.append('status', statusFilter);
+          if (priorityFilter) pageParams.append('priority', priorityFilter);
+          pageParams.append('date_from', startStr);
+          pageParams.append('date_to', endStr);
           pageParams.set('limit', String(pageSizeForCharts));
           pageParams.set('offset', String(pageIndex * pageSizeForCharts));
           pageParams.set('ordering', '-created_at');
@@ -683,7 +717,7 @@ export default function CoordinatorPanel() {
     } finally {
       setIsChartLoading(false);
     }
-  }, [dateFrom, dateTo, priorityFilter, statusFilter]);
+  }, [dateTo, priorityFilter, statusFilter]);
 
   useEffect(() => {
       fetchTickets();
@@ -711,18 +745,34 @@ export default function CoordinatorPanel() {
       fetchChartTickets();
   };
 
+  const handleBarClick = (bar) => {
+    if (!bar.key) return;
+    const [yearStr, monthStr] = bar.key.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+
+    setDateFrom(getFirstDayOfMonth(year, month));
+    setDateTo(getLastDayOfMonth(year, month));
+    setCurrentPage(1);
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
   const visibleReports = REPORTS_LIST.filter((report) => {
     if (dateFrom && report.generatedOn < dateFrom) return false;
     if (dateTo && report.generatedOn > dateTo) return false;
     return true;
   });
-  const trendData = buildTrendData(chartTickets, dateTo ? new Date(`${dateTo}T00:00:00`) : new Date());
-  const categoryData = buildCategoryDist(chartTickets);
+  const trendData = buildTrendData(chartTickets, dateFrom, dateTo, dateTo ? new Date(`${dateTo}T00:00:00`) : new Date());
+  const activeTickets = chartTickets.filter((ticket) => {
+    if (!ticket.created_at) return false;
+    const tDate = ticket.created_at.slice(0, 10); // Format YYYY-MM-DD
+    return (!dateFrom || tDate >= dateFrom) && (!dateTo || tDate <= dateTo);
+  });
+  const categoryData = buildCategoryDist(activeTickets);
 
   return (
     <main className="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-10 scrollbar-thin">
-      {/* ── Page header ── */}
+      {/* Page header */}
       <header className="mb-4 md:mb-6">
         <div className="mb-4 md:mb-5">
           <h1 className="text-[24px] md:text-[30px] font-bold tracking-[-0.015em] text-on-surface leading-tight">
@@ -747,11 +797,7 @@ export default function CoordinatorPanel() {
                 value={dateFrom}
                 max={dateTo || undefined}
                 onChange={(e) => {
-                  const nextDateFrom = e.target.value;
-                  setDateFrom(nextDateFrom);
-                  if (dateTo && nextDateFrom && nextDateFrom > dateTo) {
-                    setDateTo(nextDateFrom);
-                  }
+                  setDateFrom(e.target.value);
                   setCurrentPage(1);
                 }}
                 className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
@@ -766,11 +812,7 @@ export default function CoordinatorPanel() {
                 value={dateTo}
                 min={dateFrom || undefined}
                 onChange={(e) => {
-                  const nextDateTo = e.target.value;
-                  setDateTo(nextDateTo);
-                  if (dateFrom && nextDateTo && nextDateTo < dateFrom) {
-                    setDateFrom(nextDateTo);
-                  }
+                  setDateTo(e.target.value);
                   setCurrentPage(1);
                 }}
                 className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
@@ -779,13 +821,17 @@ export default function CoordinatorPanel() {
             <div className="flex items-end">
               <button
                 onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
+                  //default month selection
+                  const now = new Date();
+                  const y = now.getFullYear();
+                  const m = now.getMonth() + 1;
+                  setDateFrom(getFirstDayOfMonth(y, m));
+                  setDateTo(getLastDayOfMonth(y, m));
                   setCurrentPage(1);
                 }}
                 className="px-4 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors whitespace-nowrap"
               >
-                Wyczyść
+                Resetuj
               </button>
             </div>
           </div>
@@ -793,7 +839,7 @@ export default function CoordinatorPanel() {
       </header>
 
       <div className="flex flex-col gap-8">
-        {/* ── Visualization bento ── */}
+        {/* Visualization bento */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Trend chart (2/3 width) */}
           <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[26rem] sm:min-h-[32rem]">
@@ -807,14 +853,13 @@ export default function CoordinatorPanel() {
                 Ładowanie wykresu...
               </div>
             ) : trendData.length > 0 ? (
-              <BarChart data={trendData} />
+              <BarChart data={trendData} onBarClick={handleBarClick} />
             ) : (
               <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
                 Brak danych do wyświetlenia.
               </div>
             )}
           </div>
-
           {/* Category distribution (1/3 width) */}
           <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[18rem] lg:min-h-[32rem]">
             <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface mb-4 sm:mb-6 leading-tight">
@@ -850,8 +895,7 @@ export default function CoordinatorPanel() {
             )}
           </div>
         </section>
-
-        {/* ── Reports list ── */}
+        {/* Reports list */}
         <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 lg:p-8">
           {/* Section header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline-variant pb-4 sm:pb-5 mb-4 sm:mb-6">
@@ -862,7 +906,6 @@ export default function CoordinatorPanel() {
               <h2 className="text-xl sm:text-[24px] font-bold text-on-surface leading-tight">Raporty</h2>
             </div>
           </div>
-
           {/* Report items */}
           <div className="flex flex-col gap-3">
             {visibleReports.map((report) => (
@@ -877,10 +920,8 @@ export default function CoordinatorPanel() {
               </div>
             )}
           </div>
-
         </section>
-
-        {/* ── Tickets list ── */}
+        {/* Tickets list */}
         <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 lg:p-8">
           {/* Section header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline-variant pb-4 sm:pb-5 mb-4 sm:mb-6">
@@ -947,7 +988,7 @@ export default function CoordinatorPanel() {
                   <TicketRow key={ticket.id} ticket={ticket} coordinators={coordinators} onTicketUpdated={handleTicketUpdated} />
                 ))}
 
-                {/* ── Pagination Footer ── */}
+                {/* Pagination Footer */}
                 <div className="mt-8 pt-6 border-t border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-4">
                   <p className="text-sm text-on-surface-variant">
                     Pokazano <span className="font-bold text-on-surface">{Math.min(totalCount, (currentPage - 1) * pageSize + 1)} - {Math.min(totalCount, currentPage * pageSize)}</span> z <span className="font-bold text-on-surface">{totalCount}</span> zgłoszeń
@@ -969,7 +1010,6 @@ export default function CoordinatorPanel() {
                             if (pageNum === 3 || pageNum === totalPages - 2) return <span key={pageNum} className="px-2">...</span>;
                             return null;
                         }
-
                         return (
                           <button
                             key={pageNum}
@@ -984,7 +1024,6 @@ export default function CoordinatorPanel() {
                           </button>
                         );
                     })}
-
                     <button
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages || totalPages === 0 || isLoading}
