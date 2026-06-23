@@ -205,10 +205,21 @@ HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY", "")
 
 # Media files & AWS S3
 
+# lokalnie
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 USE_S3 = os.environ.get("USE_S3", "False").lower() in ("true", "1")
 if USE_S3:
-    # w chmurze
-
     # klucze
     AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
@@ -217,13 +228,11 @@ if USE_S3:
 
     # boto3
     AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_ADDRESSING_STYLE = "virtual"
     AWS_S3_FILE_OVERWRITE = False
 
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    # Pre-signed URLs
+    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_EXPIRE = 3600 # link wygasa po godzinie
 
-    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
-else:
-    # lokalnie
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR / "media"
+    STORAGES["default"]["BACKEND"] = "storages.backends.s3boto3.S3Boto3Storage"
