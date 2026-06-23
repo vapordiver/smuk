@@ -807,7 +807,7 @@ export default function CoordinatorPanel() {
           </div>
 
           {/* Category distribution (1/3 width) */}
-          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[26rem] sm:min-h-[32rem]">
+          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[18rem] lg:min-h-[32rem]">
             <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface mb-4 sm:mb-6 leading-tight">
               Dystrybucja Kategorii
             </h2>
