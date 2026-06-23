@@ -231,7 +231,7 @@ if USE_S3:
     AWS_S3_FILE_OVERWRITE = False
 
     # Pre-signed URLs
-    AWS_QUERYING_AUTH = True
-    AWS_QUERYING_EXPIRE = 3600 # link wygasa po godzinie
+    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_EXPIRE = 3600 # link wygasa po godzinie
 
     STORAGES["default"]["BACKEND"] = "storages.backends.s3boto3.S3Boto3Storage"
