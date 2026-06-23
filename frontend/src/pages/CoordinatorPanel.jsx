@@ -751,8 +751,16 @@ export default function CoordinatorPanel() {
     const year = parseInt(yearStr, 10);
     const month = parseInt(monthStr, 10);
 
-    setDateFrom(getFirstDayOfMonth(year, month));
-    setDateTo(getLastDayOfMonth(year, month));
+    const targetFirstDay = getFirstDayOfMonth(year, month);
+    const targetLastDay = getLastDayOfMonth(year, month);
+
+    if (dateFrom === targetFirstDay && dateTo === targetLastDay) {
+      setDateFrom('');
+      setDateTo('');
+    } else {
+      setDateFrom(targetFirstDay);
+      setDateTo(targetLastDay);
+    }
     setChartShiftMonths(0);
     setCurrentPage(1);
   };
@@ -806,7 +814,7 @@ export default function CoordinatorPanel() {
                   setChartShiftMonths(0); // Reset shift on manual date change
                   setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
+               className="w-full px-3 py-2.5 rounded-lg bg-surface border borl px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
               />
             </div>
             <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
@@ -828,17 +836,15 @@ export default function CoordinatorPanel() {
             <div className="flex items-end">
               <button
                 onClick={() => {
-                  const now = new Date();
-                  const y = now.getFullYear();
-                  const m = now.getMonth() + 1;
-                  setDateFrom(getFirstDayOfMonth(y, m));
-                  setDateTo(getLastDayOfMonth(y, m));
-                  setChartShiftMonths(0); // Reset shift on manual reset
+                  // Clears filters and resets view range to all months
+                  setDateFrom('');
+                  setDateTo('');
+                  setChartShiftMonths(0);
                   setCurrentPage(1);
                 }}
                 className="px-4 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors whitespace-nowrap"
               >
-                Resetuj
+                Wyczyść
               </button>
             </div>
           </div>
@@ -868,7 +874,7 @@ export default function CoordinatorPanel() {
                 Loading chart...
               </div>
             ) : trendData.length > 0 ? (
-              // smooth fading while loading
+              // smooth fading while loading (trend data)
               <div className={`relative flex-1 flex flex-col px-4 transition-all duration-300 ${isChartLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                 <button
                   onClick={() => setChartShiftMonths(prev => prev - 1)}
@@ -909,7 +915,7 @@ export default function CoordinatorPanel() {
                 Loading...
               </div>
             ) : categoryData.length > 0 ? (
-              // smooth fading while loading
+              // smooth fading while loading (category dist)
               <div className={`flex-1 flex flex-col justify-center gap-4 transition-all duration-300 ${isChartLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                 {categoryData.slice().reverse().map((cat) => (
                   <CategoryRow key={cat.label} {...cat} />
