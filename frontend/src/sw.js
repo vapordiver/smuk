@@ -30,7 +30,7 @@ async function syncTickets() {
     formData.append('description', ticket.description);
     formData.append('latitude', ticket.latitude);
     formData.append('longitude', ticket.longitude);
-    formData.append('image', ticket.image); // blob img
+    formData.append('image', ticket.image, ticket.image.name || 'offline-image.jpg');
 
     try {
       const res = await fetch('/api/tickets/', {
@@ -40,11 +40,15 @@ async function syncTickets() {
         },
         body: formData
       });
-
-      //delete only if success, validation error or error in function logic / web error doesnt delete from 'queue'
-      if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 429)) {
+      if (res.ok) {
         await db.delete('pending-tickets', ticket.id);
-        if (res.ok) successCount++;
+        successCount++;
+      } else if (res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 429) {
+        //validation error
+        await db.delete('pending-tickets', ticket.id);
+      } else {
+        //no retry storming in case of error 5xx, 401 or 429.
+        break;
       }
     } catch (err) {
       console.error('Background sync error for the ticket: ', ticket.id, err);

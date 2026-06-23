@@ -10,6 +10,13 @@ import DuplicateModal from '../components/report/DuplicateModal';
 import api from '../services/api';
 import {savePendingTicket} from "../services/db.js";
 
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+});
+
 /**
  * ReportForm — Full responsive fault-report form (mobile-first).
  * Follows the Indigo Scholar Design System.
@@ -151,6 +158,7 @@ export default function ReportForm() {
         //if offline
         if(!navigator.onLine || err.message === 'Network Error' || err.code === 'ERR_NETWORK'){
             try{
+                const base64Image = await fileToBase64(image);
                 const pendingTicket = {
                     id: Date.now().toString(), //a unique id for cache db
                     title: title.trim(),
@@ -159,7 +167,7 @@ export default function ReportForm() {
                     description: description.trim(),
                     latitude: location.lat,
                     longitude: location.lng,
-                    image: image,
+                    image: base64Image,
                     token: localStorage.getItem('accessToken')
                 };
                 await savePendingTicket(pendingTicket);

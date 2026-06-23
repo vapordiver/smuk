@@ -1,4 +1,4 @@
-import {useState, useEffect, useCallback} from 'react';
+import {useState, useEffect, useCallback, useRef} from 'react';
 import {BrowserRouter, Routes, Route, Outlet, useLocation} from 'react-router-dom';
 import {AuthProvider} from "./context/AuthContext";
 import {NotificationProvider} from './context/NotificationContext';
@@ -27,6 +27,11 @@ function Layout() {
     const location = useLocation();
     const {toast, showToast} = useToast();
 
+    //blocks multiple sync tries at same time
+    const isSyncingRef = useRef(false);
+    //blocks synchro start after every sitee switch
+    const isInitialMount = useRef(true);
+
     // Auto-close sidebar on route change
     useEffect(() => {
         setSidebarOpen(false);
@@ -34,36 +39,61 @@ function Layout() {
 
     //fallback : manual synchronization for iOS safari after user is back online
     const syncPending = useCallback(async () => {
+        if (isSyncingRef.current) {
+            return;
+        }
+        isSyncingRef.current = true;
         try {
             const tickets = await getPendingTickets();
             if (!tickets || tickets.length === 0) {
+                isSyncingRef.current = false;
                 return;
             }
             let successCount = 0;
             for (const ticket of tickets) {
-                const formData = new FormData();
-                formData.append('title', ticket.title);
-                formData.append('category_id', ticket.categoryId);
-                if (ticket.building_id) {
-                    formData.append('building_id', ticket.buildingId);
-                }
-                formData.append('description', ticket.description);
-                formData.append('latitude', ticket.latitude);
-                formData.append('longitude', ticket.longitude);
-                formData.append('image', ticket.image);
                 try {
-                    //force authorization with saved token
-                    const res = await api.post('/tickets/', formData, {
+                    const formData = new FormData();
+                    formData.append('title', ticket.title);
+                    formData.append('category_id', ticket.categoryId);
+                    if (ticket.buildingId) {
+                        formData.append('building_id', ticket.buildingId);
+                    }
+                    formData.append('description', ticket.description);
+                    formData.append('latitude', ticket.latitude);
+                    formData.append('longitude', ticket.longitude);
+                    //conversion to base64 (issues with ios image sending)
+                    let imageBlob = ticket.image;
+                    if (typeof ticket.image === 'string' && ticket.image.startsWith('data:image')) {
+                        const fetchRes = await fetch(ticket.image);
+                        imageBlob = await fetchRes.blob();
+                    }
+                    formData.append('image', imageBlob, 'offline-image.jpg');
+                    //401 issue fix, try get newest token instead of old one
+                    const activeToken = localStorage.getItem('accessToken') || ticket.token;
+                    //fetch instead of api.post, resolves issues with wrong data format
+                    const res = await fetch('/api/tickets/', {
+                        method: 'POST',
                         headers: {
-                            'Content-Type': 'multipart/form-data',
-                            'Authorization': `Bearer ${ticket.token}`
-                        }
+                            'Authorization': `Bearer ${activeToken}`,
+                            'ngrok-skip-browser-warning': 'true'
+                        },
+                        body: formData
                     });
+
+                    //fetch error handling
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        const errorMsg = errData?.error?.message || errData?.detail || `Kod błędu: ${res.status}`;
+                        throw new Error(errorMsg);
+                    }
+                    //if success
                     await deletePendingTicket(ticket.id);
                     successCount++;
                 } catch (err) {
-                    //delete only if success, validation error or error in function logic / web error doesnt delete from 'queue'
-                    if (err.response && err.response.status >= 400 && err.response.status < 500 && err.response.status !== 401 && err.response.status !== 429) {
+                    console.error("Błąd wysyłki offline:", err);
+                    showToast('error', `Błąd wysyłki: ${err.message}`);
+                    // if issue (400) - validation or geofencing, delete ticket from queue
+                    if (err.message.includes("400") || err.message.toLowerCase().includes("validation")) {
                         await deletePendingTicket(ticket.id);
                     }
                 }
@@ -72,29 +102,38 @@ function Layout() {
                 showToast('success', `Wysłano ${successCount} zgłoszeń zapisanych offline.`);
             }
         } catch (error) {
-            console.error("Error during manual synchronization", error);
+            console.error("Synchronization error:", error);
+        } finally {
+            isSyncingRef.current = false;
         }
     }, [showToast]);
 
     //events for iOS ssafari (on open/refresh app)
     useEffect(() => {
+        const supportsBackgroundSync = 'serviceWorker' in navigator && 'SyncManager' in window;
+        //if android == only run service worker (syncmanacger)
+        //block manual synchro to stop 429 from happening
+        if (supportsBackgroundSync) {
+            const handleSWMessage = (event) => {
+                if (event.data && event.data.type === 'SYNC_SUCCESS') {
+                    showToast('success', `Wysłano ${event.data.count} zgłoszeń zapisanych offline.`);
+                }
+            };
+            navigator.serviceWorker?.addEventListener('message', handleSWMessage);
+            return () => {
+                navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
+            };
+        }
+
+        //ios safari (no support for syncmanager)
         window.addEventListener('online', syncPending);
-        //exec immediately
-        if (navigator.onLine) {
+        if (navigator.onLine && isInitialMount.current) {
+            isInitialMount.current = false;
             syncPending();
         }
-        //listen for success on background sync from serviceworker (android chrome)
-        const handleSWMessage = (event) => {
-            if (event.data && event.data.type === 'SYNC_SUCCESS') {
-                showToast('success', `Wysłano ${event.data.count} zgłoszeń zapisanych offline.`);
-            }
-        };
-        navigator.serviceWorker?.addEventListener('message', handleSWMessage);
-
         return () => {
             window.removeEventListener('online', syncPending);
-            navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
-        }
+        };
     }, [syncPending, showToast]);
 
     return (
