@@ -618,7 +618,8 @@ export default function CoordinatorPanel() {
         }
 
         const res = await api.get(`tickets/?${params.toString()}`);
-        setTickets(res.data.results || []);
+        const mainTickets = (res.data.results || []).filter(ticket => ticket.parent_ticket === null);
+        setTickets(mainTickets);
         setTotalCount(res.data.count || 0);
     } catch (err) {
         console.error("Błąd podczas pobierania danych:", err);
