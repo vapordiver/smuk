@@ -49,7 +49,17 @@ class Command(BaseCommand):
         "Pęknięte ogrodzenie": "Panel ogrodzeniowy przy granicy kampusu jest wygięty i uszkodzony.",
     }
 
+    CATEGORY_IMAGES = {
+        "Zieleń i trawniki": "ogrod.jpg",
+        "Oświetlenie i elektryka": "elektryka.jpg",
+        "Nawierzchnia i drogi": "drogi.webp",
+        "Mała architektura i ogrodzenia": "mala.avif",
+    }
+
     def handle(self, *args, **kwargs):
+        import os
+        from io import BytesIO
+        from django.core.files import File
 
         reporter = User.objects.filter(
             email="reporter1@edu.p.lodz.pl"
@@ -75,6 +85,21 @@ class Command(BaseCommand):
         if not categories:
             raise CommandError("Brak kategorii.")
 
+        # Pre-load seed images from fixtures/seed_images/
+        seed_images_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'fixtures', 'seed_images')
+        loaded_images = {}
+        for cat_name, filename in self.CATEGORY_IMAGES.items():
+            filepath = os.path.join(seed_images_dir, filename)
+            if os.path.exists(filepath):
+                with open(filepath, 'rb') as f:
+                    loaded_images[cat_name] = (filename, f.read())
+                self.stdout.write(f"  Załadowano obraz: {filename}")
+            else:
+                self.stdout.write(self.style.WARNING(f"  Brak pliku: {filepath}"))
+
+        if not loaded_images:
+            raise CommandError("Nie znaleziono żadnych plików obrazów w katalogu fixtures/seed_images/.")
+
         created = 0
         now = timezone.now()
 
@@ -88,7 +113,8 @@ class Command(BaseCommand):
             selected_building = random.choice(buildings)
             days_ago = random.randint(0,180)
             ticket_date = now - timedelta(days=days_ago)
-            ticket = Ticket.objects.create(
+
+            ticket = Ticket(
                 title=title,
                 description=self.DESCRIPTIONS.get(
                     title,
@@ -99,30 +125,26 @@ class Command(BaseCommand):
                 reporter=reporter,
                 assigned_to=coord,
                 location=selected_building.centroid,
-                #priority=random.choice([
-                #    Ticket.Priority.LOW,
-                #    Ticket.Priority.MEDIUM,
-                #    Ticket.Priority.HIGH,
-                #    Ticket.Priority.CRITICAL,
-                #]),
                 priority=Ticket.Priority.LOW,
                 status=random.choice([
                     Ticket.Status.NEW,
                     Ticket.Status.IN_PROGRESS,
                     Ticket.Status.RESOLVED,
                 ]),
-                image = "tickets/2026/06/15/demo.webp" # no such file hehe, but I guess its better to write anything since its required in contract
-                #and if no such file exists frontend will just provide nothing same as if this code wasn't here
             )
+
+            # Save image through Django storage API (works with both local and S3)
+            img_filename, img_bytes = loaded_images.get(
+                category.name,
+                list(loaded_images.values())[0]
+            )
+            ticket.image.save(img_filename, File(BytesIO(img_bytes)), save=False)
+            ticket.save()
 
             #auto_now_add forces current data so just update it
             Ticket.objects.filter(pk=ticket.pk).update(created_at=ticket_date, updated_at=ticket_date)
 
             created += 1
-
-            #self.stdout.write(
-            #    f"[{created}/100] Ticket #{ticket.id}: {ticket.title}"
-            #)
 
         self.stdout.write(
             self.style.SUCCESS(
