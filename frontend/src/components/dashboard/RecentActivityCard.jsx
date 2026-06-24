@@ -9,7 +9,7 @@ export default function RecentActivityCard({ items = [], loading = false, error 
         <h3 className="text-lg font-bold">Ostatnia aktywność</h3>
         <Link
           to="/my-tickets"
-          className="text-primary font-semibold text-sm hover:underline cursor-pointer whitespace-nowrap ml-4"
+          className="text-primary font-semibold text-xs sm:text-sm hover:underline cursor-pointer whitespace-nowrap ml-4"
         >
           Zobacz wszystkie zgłoszenia
         </Link>

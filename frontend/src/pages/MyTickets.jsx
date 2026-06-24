@@ -100,25 +100,25 @@ const getAuditFieldLabel = (fieldChanged) => {
 const getAuditChangeText = (entry) => {
     if (entry.field_changed === 'assigned_to') {
         if (!entry.old_value && entry.new_value) {
-            return `na ${entry.new_value}`;
+             return <>na <strong className="font-bold text-slate-800">{entry.new_value}</strong></>;
         }
 
         if (entry.old_value && entry.new_value) {
-            return `z ${entry.old_value} na ${entry.new_value}`;
+            return <>z <span className="line-through text-slate-400">{entry.old_value}</span> na <strong className="font-bold text-slate-800">{entry.new_value}</strong></>;
         }
 
         if (entry.old_value && !entry.new_value) {
-            return `z ${entry.old_value} na brak przypisania`;
+            return <>z <span className="line-through text-slate-400">{entry.old_value}</span> na <strong className="font-bold text-slate-800">brak przypisania</strong></>;
         }
     }
 
     if (entry.field_changed === 'status' || entry.field_changed === 'priority') {
         const oldValue = mapAuditValueToPolish(entry.field_changed, entry.old_value) || 'brak';
         const newValue = mapAuditValueToPolish(entry.field_changed, entry.new_value) || 'brak';
-        return `z ${oldValue} na ${newValue}`;
+        return <>z <strong className="line-through font-bold text-slate-400">{oldValue}</strong> na <strong className="font-bold text-slate-800">{newValue}</strong></>;;
     }
 
-    return `z ${entry.old_value || 'brak'} na ${entry.new_value || 'brak'}`;
+    return <>z <span className="line-through text-slate-400">{entry.old_value || 'brak'}</span> na <strong className="font-bold text-slate-800">{entry.new_value || 'brak'}</strong></>;
 };
 
 //ticket card display
@@ -288,7 +288,7 @@ const TicketModal = ({ticket, onClose}) => {
                             Lokalizacja
                         </h4>
                         <div className="text-slate-600 space-y-1">
-                            <p><strong>Budynek:</strong> {ticket.building?.name || "Okolice kampusu"}</p>
+                            <p><strong>Budynek:</strong> {ticket.building?.name || "Teren kampusu"}</p>
                             {ticket.floor && <p><strong>Piętro:</strong> {ticket.floor}</p>}
                             {ticket.room && <p><strong>Pokój:</strong> {ticket.room}</p>}
                         </div>
@@ -325,8 +325,9 @@ const TicketModal = ({ticket, onClose}) => {
                                             {formatDate(entry.created_at)}
                                         </div>
                                         <div>
+                                            {/* render SYSTEM if user null */}
                                             <span className="font-medium text-slate-700">
-                                                {entry.user?.first_name} {entry.user?.last_name}
+                                                {entry.user ? `${entry.user.first_name} ${entry.user.last_name}` : 'SYSTEM'}
                                             </span>
                                             <span className="text-slate-500"> zmienił(a) </span>
                                             <span

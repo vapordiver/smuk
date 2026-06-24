@@ -12,31 +12,41 @@ class Command(BaseCommand):
     help = "Generuje 100 losowych ticketów"
 
     TICKETS_BY_CATEGORY = {
-        "Instalacja wodna": [
-            "Pęknięta rura",
-            "Kapiący kran",
-            "Brak wody w kranie",
+        "Zieleń i trawniki": [
+            "Nieskoszona trawa",
+            "Uszkodzone drzewo",
+            "Zanieczyszczony trawnik",
         ],
-        "Elektryka": [
-            "Spalona żarówka",
-            "Niedziałające gniazdko",
-            "Brak prądu",
+        "Oświetlenie i elektryka": [
+            "Niedziałająca latarnia",
+            "Uszkodzona skrzynka elektryczna",
+            "Migające światło",
         ],
-        "Ogrzewanie": [
-            "Brak ogrzewania",
-            "Uszkodzone pokrętło do zmiany temperatury",
+        "Nawierzchnia i drogi": [
+            "Dziura w chodniku",
+            "Uszkodzony krawężnik",
+            "Zapadnięta kostka",
+        ],
+        "Mała architektura i ogrodzenia": [
+            "Uszkodzona ławka",
+            "Przepełniony kosz",
+            "Pęknięte ogrodzenie",
         ],
     }
 
     DESCRIPTIONS = {
-        "Pęknięta rura": "Zauważono wyciek wody z instalacji.",
-        "Kapiący kran": "Kran przecieka i wymaga naprawy.",
-        "Brak wody w kranie": "Po odkręceniu kranu nie leci woda.",
-        "Spalona żarówka": "Oświetlenie nie działa.",
-        "Niedziałające gniazdko": "Gniazdko nie dostarcza zasilania.",
-        "Brak prądu": "W pomieszczeniu nie ma zasilania.",
-        "Brak ogrzewania": "Pomieszczenie pozostaje zimne.",
-        "Uszkodzone pokrętło do zmiany temperatury": "Nie można regulować temperatury.",
+        "Nieskoszona trawa": "Trawa w tym obszarze jest bardzo wysoka i wymaga skoszenia.",
+        "Uszkodzone drzewo": "Połamane gałęzie drzewa zagrażają przechodniom po ostatniej burzy.",
+        "Zanieczyszczony trawnik": "Na trawniku zalega duża ilość liści i śmieci.",
+        "Niedziałająca latarnia": "Latarnia zewnętrzna nie świeci po zmroku.",
+        "Uszkodzona skrzynka elektryczna": "Drzwiczki skrzynki rozdzielczej na zewnątrz są otwarte i wystają kable.",
+        "Migające światło": "Zewnętrzne oświetlenie nad wejściem do budynku miga i utrudnia widoczność.",
+        "Dziura w chodniku": "Zauważono głęboką dziurę w płytkach chodnikowych, można się potknąć.",
+        "Uszkodzony krawężnik": "Krawężnik przy drodze dojazdowej jest ukruszony i wystaje.",
+        "Zapadnięta kostka": "Kostka brukowa na parkingu zapadła się, tworząc głęboką kałużę.",
+        "Uszkodzona ławka": "Ławka parkowa ma złamane deski i wystające gwoździe.",
+        "Przepełniony kosz": "Kosz na śmieci przy alejce jest całkowicie przepełniony, odpady wysypują się na ziemię.",
+        "Pęknięte ogrodzenie": "Panel ogrodzeniowy przy granicy kampusu jest wygięty i uszkodzony.",
     }
 
     def handle(self, *args, **kwargs):

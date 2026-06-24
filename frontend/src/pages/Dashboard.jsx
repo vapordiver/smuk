@@ -104,7 +104,7 @@ export default function Dashboard() {
 
   return (
     <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 lg:p-10 scrollbar-thin">
-      <header className="mb-10">
+      <header className="mb-6 md:mb-10">
         <h1 className="text-[36px] font-bold tracking-tight text-on-background mb-2">
           Witaj, {user?.first_name || 'Użytkowniku'}!
         </h1>
@@ -158,11 +158,11 @@ export default function Dashboard() {
           {/* report href */}
           <div className="lg:col-span-6">
             <Link to="/report" className="block h-full">
-              <div className="bg-primary rounded-xl p-8 shadow-lg shadow-primary/20 flex flex-col justify-center text-on-primary relative overflow-hidden group hover:scale-[0.98] transition-transform cursor-pointer h-full min-h-[160px]">
+              <div className="bg-primary rounded-xl p-5 md:p-8 shadow-lg shadow-primary/20 flex flex-col justify-center text-on-primary relative overflow-hidden group hover:scale-[0.98] transition-transform cursor-pointer h-full min-h-[120px] md:min-h-[160px]">
                 <div className="relative z-10">
                   <div className="flex items-center gap-4 mb-4">
-                    <span className="material-symbols-outlined text-5xl">emergency_home</span>
-                    <h2 className="text-2xl font-bold">Zgłoś usterkę</h2>
+                    <span className="material-symbols-outlined text-4xl md:text-5xl">emergency_home</span>
+                    <h2 className="text-xl md:text-2xl font-bold">Zgłoś usterkę</h2>
                   </div>
                   <p className="text-primary-fixed-dim max-w-xs">
                     Zauważyłeś problem? Prześlij szybkie zgłoszenie, a nasz zespół zajmie się nim natychmiast.

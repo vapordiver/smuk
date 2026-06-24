@@ -10,10 +10,9 @@ import MyTickets from './pages/MyTickets';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CampusMap from './pages/CampusMap';
-import AdminPanel from './pages/AdminPanel';
-import ProfilePage from './pages/ProfilePage';
 import CoordinatorPanel from './pages/CoordinatorPanel';
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import PublicRoute from "./components/common/PublicRoute.jsx";
 import Toast, {useToast} from "./components/common/Toast.jsx";
 import {getPendingTickets, claimPendingTicket, savePendingTicket} from "./services/db.js";
 import api from "./services/api"
@@ -174,15 +173,15 @@ export default function App() {
                             <Route element={<ProtectedRoute/>}>
                                 <Route path="/report" element={<ReportForm/>}/>
                                 <Route path="/my-tickets" element={<MyTickets/>}/>
-                                <Route path="/profile" element={<ProfilePage/>}/>
                             </Route>
                             <Route element={<ProtectedRoute allowedRoles={['coordinator']}/>}>
                                 <Route path="/admin" element={<CoordinatorPanel/>}/>
                             </Route>
                         </Route>
-                        {/* Auth routes – no sidebar */}
-                        <Route path="/login" element={<Login/>}/>
-                        <Route path="/register" element={<Register/>}/>
+                        <Route element={<PublicRoute/>}>
+                            <Route path="/login" element={<Login/>}/>
+                            <Route path="/register" element={<Register/>}/>
+                        </Route>
                     </Routes>
                 </BrowserRouter>
             </NotificationProvider>

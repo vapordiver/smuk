@@ -13,7 +13,6 @@ import { useAuth } from '../../context/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/', icon: 'dashboard', label: 'Dashboard' },
-  { to: '/report', icon: 'report_problem', label: 'Zgłoś usterkę' },
   { to: '/my-tickets', icon: 'format_list_bulleted', label: 'Moje zgłoszenia' },
   { to: '/map', icon: 'map', label: 'Mapa kampusu' },
 ];

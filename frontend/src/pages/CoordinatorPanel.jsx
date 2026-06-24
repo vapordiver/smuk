@@ -7,39 +7,39 @@ import api from '../services/api';
  */
 
 /* ── Chart helpers ── */
-const CATEGORY_COLORS = ['bg-primary', 'bg-secondary', 'bg-tertiary', 'bg-outline-variant'];
-const CATEGORY_HEX_COLORS = [
-  'var(--color-primary)',
-  'var(--color-secondary)',
-  'var(--color-tertiary)',
-  'var(--color-outline-variant)',
-  '#a78bfa',
-  '#34d399',
-  '#f97316',
-  '#e879f9',
-];
+// Category colors map
+const getCategoryColorsMap = (tickets) => {
+  const colorMap = new Map();
+  colorMap.set('Inne', '#94a3b8'); // Default fallback color
+
+  tickets.forEach((ticket) => {
+    const catName = ticket.category?.name || 'Inne';
+    const catColor = ticket.category?.color;
+    if (catColor && catName !== 'Inne') {
+      colorMap.set(catName, catColor);
+    }
+  });
+  return colorMap;
+};
+
+// Helper functions for date operations
+const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const getFirstDayOfMonth = (year, month) => {
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+};
+
+const getLastDayOfMonth = (year, month) => {
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+};
+
 const MONTH_LABELS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
-const REPORTS_LIST = [
-  {
-    id: 1,
-    icon: 'picture_as_pdf',
-    iconColor: 'text-primary-fixed-dim',
-    title: 'Raport Miesięczny - Luty 2024',
-    description: 'Wszystkie kategorie, Wszystkie statusy',
-    generatedAt: 'Dzisiaj, 09:41',
-    generatedOn: '2024-02-15',
-  },
-  {
-    id: 2,
-    icon: 'analytics',
-    iconColor: 'text-secondary',
-    title: 'Usterki IT - Semestr Zimowy',
-    description: 'Infrastruktura IT, Tylko zakończone',
-    generatedAt: 'Wczoraj, 14:20',
-    generatedOn: '2024-01-18',
-  },
-];
+const formatReportDate = (isoDateStr) => {
+  if (!isoDateStr) return '—';
+  return new Date(isoDateStr).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 const STATUS_MAP = {
   NEW: { label: 'Nowe', color: 'bg-primary/10 text-primary' },
@@ -55,8 +55,6 @@ const PRIORITY_MAP = {
   CRITICAL: { label: 'Krytyczny', color: 'text-error font-bold' }
 };
 
-// Removed MOCK_COORDINATORS
-
 const formatDate = (isoString) => {
     if (!isoString) return '—';
     return new Date(isoString).toLocaleDateString('pl-PL', {
@@ -68,14 +66,12 @@ const formatDate = (isoString) => {
     });
 };
 
-const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
 const getMonthLabel = (date) => {
   const month = MONTH_LABELS_PL[date.getMonth()] || '';
   return month ? month.charAt(0).toUpperCase() + month.slice(1) : '';
 };
 
-const buildTrendData = (tickets, endDate = new Date()) => {
+const buildTrendData = (tickets, dateFromStr, dateToStr, endDate = new Date()) => {
   const months = Array.from({ length: 6 }, (_, index) => {
     const monthDate = new Date(endDate.getFullYear(), endDate.getMonth() - 5 + index, 1);
     return {
@@ -84,6 +80,7 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     };
   });
 
+  const catColorMap = getCategoryColorsMap(tickets);
   // Collect per-month category counts
   const monthCatCounts = new Map(months.map((m) => [m.key, new Map()]));
 
@@ -98,7 +95,7 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     catMap.set(catLabel, (catMap.get(catLabel) || 0) + 1);
   });
 
-  // Build a global ordered category list (by total count descending)
+  // Build global ordered category list alphabetically
   const globalCatTotals = new Map();
   monthCatCounts.forEach((catMap) => {
     catMap.forEach((count, cat) => {
@@ -106,8 +103,11 @@ const buildTrendData = (tickets, endDate = new Date()) => {
     });
   });
   const orderedCats = [...globalCatTotals.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([cat], idx) => ({ cat, color: CATEGORY_HEX_COLORS[idx % CATEGORY_HEX_COLORS.length] }));
+    .map(([cat]) => ({
+      cat,
+      color: catColorMap.get(cat) || '#94a3b8'
+    }))
+    .sort((a, b) => a.cat.localeCompare(b.cat));
 
   const totals = months.map((m) => {
     const catMap = monthCatCounts.get(m.key) || new Map();
@@ -115,19 +115,24 @@ const buildTrendData = (tickets, endDate = new Date()) => {
   });
   const maxValue = Math.max(...totals, 1);
 
+  const startLimit = dateFromStr ? dateFromStr.slice(0, 7) : '';
+  const endLimit = dateToStr ? dateToStr.slice(0, 7) : '';
+
   return months.map((month, index) => {
     const catMap = monthCatCounts.get(month.key) || new Map();
     const total = totals[index];
-    // Segments sorted from largest to smallest (will render bottom-to-top)
     const segments = orderedCats
       .map(({ cat, color }) => ({ cat, count: catMap.get(cat) || 0, color }))
-      .filter((s) => s.count > 0)
-      .sort((a, b) => b.count - a.count);
+      .filter((s) => s.count > 0);
+
+    const isActive = (!startLimit || month.key >= startLimit) && (!endLimit || month.key <= endLimit);
+
     return {
+      key: month.key,
       label: month.label,
       value: total,
-      heightPct: total === 0 ? 8 : Math.max(12, Math.round((total / maxValue) * 85)),
-      active: index === months.length - 1,
+      heightPct: total === 0 ? 8 : Math.max(12, Math.round((total / maxValue) * 100)),
+      active: isActive,
       segments,
       orderedCats,
     };
@@ -136,30 +141,36 @@ const buildTrendData = (tickets, endDate = new Date()) => {
 
 const buildCategoryDist = (tickets) => {
   const counts = new Map();
+  const catColorMap = getCategoryColorsMap(tickets);
 
   tickets.forEach((ticket) => {
     const label = ticket.category?.name || 'Inne';
     counts.set(label, (counts.get(label) || 0) + 1);
   });
 
-  const sortedEntries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const sortedByCount = [...counts.entries()]
+    .filter(([label]) => label !== 'Inne')
+    .sort((a, b) => b[1] - a[1]);
 
-  if (sortedEntries.length === 0) {
-    return [];
+  if (sortedByCount.length === 0) {
+    const inneCount = counts.get('Inne') || 0;
+    return inneCount > 0 ? [{ label: 'Inne', pct: 100, color: '#94a3b8' }] : [];
   }
 
-  const topEntries = sortedEntries.slice(0, 3);
-  const remainingCount = sortedEntries.slice(3).reduce((sum, [, count]) => sum + count, 0);
+  const top5 = sortedByCount.slice(0, 5);
+  const remainingCount = sortedByCount.slice(5).reduce((sum, [, count]) => sum + count, 0) + (counts.get('Inne') || 0);
+  const stableTop5 = top5.sort((a, b) => a[0].localeCompare(b[0]));
+  const finalEntries = [...stableTop5];
   if (remainingCount > 0) {
-    topEntries.push(['Inne', remainingCount]);
+    finalEntries.push(['Inne', remainingCount]);
   }
 
   const total = tickets.length || 1;
 
-  return topEntries.map(([label, count], index) => ({
+  return finalEntries.map(([label, count]) => ({
     label,
     pct: Math.round((count / total) * 100),
-    color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+    color: catColorMap.get(label) || '#94a3b8',
   }));
 };
 
@@ -176,39 +187,48 @@ const createBaseTicketParams = ({ statusFilter, priorityFilter, dateFrom, dateTo
 
 /* ── Sub-components ── */
 
-function BarChart({ data }) {
-  // Collect legend from the last bar that has orderedCats (all bars share the same list)
-  const orderedCats = data.find((b) => b.orderedCats?.length > 0)?.orderedCats || [];
-
+function BarChart({ data, onBarClick }) {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Chart area */}
-      <div className="flex-1 flex items-end justify-between gap-2 md:gap-6 pt-4 pb-2 border-b border-outline-variant relative">
+      <div className="flex-1 flex items-end justify-between gap-2 md:gap-6 border-b border-outline-variant relative">
         {/* Dashed guide lines */}
-        <div className="absolute left-0 top-0 h-full w-full flex flex-col justify-between pointer-events-none z-0">
+        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none z-0">
           <div className="border-b border-dashed border-outline-variant w-full h-0" />
           <div className="border-b border-dashed border-outline-variant w-full h-0" />
           <div className="border-b border-dashed border-outline-variant w-full h-0" />
         </div>
 
         {data.map((bar) => (
-          <div key={bar.label} className="flex flex-col items-center justify-end w-full h-full z-10">
-            {/* Stacked bar */}
+          <div
+            key={bar.label}
+            className="flex flex-col items-center justify-end w-full h-full z-10 cursor-pointer group/bar"
+            onClick={() => onBarClick && onBarClick(bar)}
+          >
+            {/* Stacked bar with border */}
             <div
-              className="w-full rounded-t-md overflow-hidden relative flex flex-col-reverse"
+              className={`w-full rounded-t-md relative flex flex-col-reverse transition-all duration-200 group-hover/bar:scale-[1.02] ${
+                bar.value > 0
+                  ? bar.active
+                    ? 'border-2 border-slate-800'
+                    : 'border-2 border-slate-800/30'
+                  : 'border border-outline-variant/30'
+              }`}
               style={{ height: `${bar.heightPct}%` }}
-              title={bar.segments.map((s) => `${s.cat}: ${s.count}`).join('\n') || bar.label}
+              title={[...bar.segments].reverse().map((s) => `${s.cat}: ${s.count}`).join('\n') || bar.label}
             >
               {bar.value === 0 ? (
-                <div className="w-full h-full bg-outline-variant/20 rounded-t-md" />
+                <div className="w-full h-full bg-outline-variant/10 rounded-t-sm" />
               ) : (
-                bar.segments.map((seg) => (
+                bar.segments.map((seg, index) => (
                   <div
                     key={seg.cat}
-                    className="w-full shrink-0"
+                    className={`w-full ${
+                      index === bar.segments.length - 1 ? 'rounded-t-sm' : ''
+                    } ${index > 0 ? 'border-b-2 border-slate-800' : ''}`}
                     style={{
-                      height: `${Math.round((seg.count / bar.value) * 100)}%`,
-                      minHeight: seg.count > 0 ? '4px' : '0',
+                      flex: `${seg.count} 1 auto`,
+                      minHeight: seg.count > 0 ? '5px' : '0',
                       backgroundColor: seg.color,
                       opacity: bar.active ? 1 : 0.55,
                     }}
@@ -224,31 +244,22 @@ function BarChart({ data }) {
                 </div>
               )}
             </div>
-            <span
-              className={`text-xs font-medium mt-3 ${
-                bar.active ? 'text-primary font-bold' : 'text-on-surface-variant'
-              }`}
-            >
-              {bar.label}
-            </span>
           </div>
         ))}
       </div>
-
-      {/* Legend */}
-      {orderedCats.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-2">
-          {orderedCats.map(({ cat, color }) => (
-            <div key={cat} className="flex items-center gap-1.5">
-              <div
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-[11px] text-on-surface-variant font-medium">{cat}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* bar Labels */}
+      <div className="flex justify-between gap-2 md:gap-6 mt-3 shrink-0">
+        {data.map((bar) => (
+          <span
+            key={bar.label}
+            className={`text-xs font-medium w-full text-center transition-colors duration-200 ${
+              bar.active ? 'text-primary font-bold' : 'text-on-surface-variant'
+            }`}
+          >
+            {bar.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -256,60 +267,92 @@ function BarChart({ data }) {
 function CategoryRow({ label, pct, color }) {
   return (
     <div className="flex items-center gap-3">
-      <div className={`w-3 h-3 rounded-full shrink-0 ${color}`} />
+      <div
+        className="w-3 h-3 rounded-full shrink-0"
+        style={{ backgroundColor: color }}
+      />
       <span className="flex-1 text-sm font-medium text-on-surface">{label}</span>
       <span className="text-sm font-bold text-on-surface">{pct}%</span>
     </div>
   );
 }
 
-function ReportRow({ report, dateFrom, dateTo }) {
+function ReportRow({ report }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const stats = report.raw_stats || {};
+  const weekLabel = `${formatReportDate(report.week_start)} – ${formatReportDate(report.week_end)}`;
+  const generatedAt = report.created_at
+    ? new Date(report.created_at).toLocaleString('pl-PL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '—';
+
   return (
-    <div className="bg-surface rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 outline outline-1 outline-outline hover:shadow-sm transition-shadow group">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center shrink-0">
-          <span
-            className={`material-symbols-outlined ${report.iconColor}`}
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            {report.icon}
-          </span>
-        </div>
-        <div>
-          <h3 className="font-bold text-on-surface">{report.title}</h3>
-          <div className="flex items-center gap-2 text-sm text-on-surface-variant mt-1 flex-wrap">
-            <span className="material-symbols-outlined text-[16px]">schedule</span>
-            <span>{report.generatedAt}</span>
-            <span className="mx-1">•</span>
-            <span>{report.description}</span>
-            {(dateFrom || dateTo) && (
-              <>
-                <span className="mx-1">•</span>
-                <span className="text-primary font-medium">
-                  {dateFrom || '…'} – {dateTo || '…'}
-                </span>
-              </>
-            )}
+    <div className="bg-surface rounded-xl flex flex-col outline outline-1 outline-outline hover:shadow-sm transition-shadow">
+      <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <span
+              className="material-symbols-outlined text-primary"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              analytics
+            </span>
           </div>
+          <div className="min-w-0">
+            <h3 className="font-bold text-on-surface">
+              Raport tygodniowy: {weekLabel}
+            </h3>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-on-surface-variant mt-1">
+              <span className="material-symbols-outlined text-[15px]">schedule</span>
+              <span>Wygenerowano: {generatedAt}</span>
+              {stats.total_created != null && (
+                <>
+                  <span className="mx-0.5">•</span>
+                  <span>{stats.total_created} nowych</span>
+                </>
+              )}
+              {stats.total_resolved != null && (
+                <>
+                  <span className="mx-0.5">•</span>
+                  <span>{stats.total_resolved} rozwiązanych</span>
+                </>
+              )}
+              {stats.total_open != null && (
+                <>
+                  <span className="mx-0.5">•</span>
+                  <span>{stats.total_open} otwartych</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          {report.content && (
+            <button
+              className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
+              title={expanded ? 'Zwiń szczegóły' : 'Rozwiń podsumowanie AI'}
+              onClick={() => setExpanded(v => !v)}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {expanded ? 'expand_less' : 'smart_toy'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-        <button
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low text-on-surface font-semibold text-sm hover:bg-outline-variant/50 transition-colors"
-          title="Pobierz PDF"
-        >
-          <span className="material-symbols-outlined text-[18px]">download</span>
-          PDF
-        </button>
-        <button
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low text-on-surface font-semibold text-sm hover:bg-outline-variant/50 transition-colors"
-          title="Pobierz CSV"
-        >
-          <span className="material-symbols-outlined text-[18px]">csv</span>
-          CSV
-        </button>
-      </div>
+      {expanded && report.content && (
+        <div className="px-4 pb-4 pt-0 border-t border-outline-variant">
+          <div className="mt-3 p-3 bg-surface-container-low rounded-xl text-sm text-on-surface leading-relaxed whitespace-pre-wrap">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+              <span className="material-symbols-outlined text-[14px]">smart_toy</span>
+              Podsumowanie AI
+            </div>
+            {report.content}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -414,7 +457,7 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
 
     return {
        title: `Zmieniono ${name}`,
-       content: <>z <span className="line-through">{formatVal(log.old_value, log.field_changed)}</span> na <span className="font-bold text-primary">{formatVal(log.new_value, log.field_changed)}</span></>
+       content: <>z <strong className="line-through font-bold">{formatVal(log.old_value, log.field_changed)}</strong> na <strong className="font-bold text-primary">{formatVal(log.new_value, log.field_changed)}</strong></>
     };
   };
 
@@ -512,8 +555,9 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                  return (
                    <div key={log.id} className="relative pl-3 sm:pl-4">
                      <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-primary/40 border-2 border-surface" />
+                       {/* render SYSTEM if user null */}
                      <div className="text-[11px] sm:text-xs font-medium text-on-surface-variant mb-0.5">
-                       {formatDate(log.created_at)} • {log.user?.first_name} {log.user?.last_name}
+                       {formatDate(log.created_at)} • {log.user ? `${log.user.first_name} ${log.user.last_name}` : 'SYSTEM'}
                      </div>
                      <div className="text-[13px] sm:text-sm text-on-surface font-semibold">{display.title}</div>
                      <div className="text-[11px] sm:text-xs text-on-surface-variant mt-1 p-2 bg-surface-container rounded-lg border border-outline">
@@ -526,7 +570,6 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
                )}
              </div>
           </div>
-
           {ticket.status === 'CLOSED' && (
               <div className="mt-2 pt-3 sm:pt-4 border-t border-outline-variant text-[13px] sm:text-sm text-on-surface-variant italic text-center">
                   Zgłoszenie jest zamknięte i nie można go już edytować.
@@ -587,18 +630,25 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
 
 /* ── Main page ── */
 export default function CoordinatorPanel() {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonthNum = today.getMonth() + 1;
+
+  const [dateFrom, setDateFrom] = useState(getFirstDayOfMonth(currentYear, currentMonthNum));
+  const [dateTo, setDateTo] = useState(getLastDayOfMonth(currentYear, currentMonthNum));
+  const [chartShiftMonths, setChartShiftMonths] = useState(0);
   const [tickets, setTickets] = useState([]);
   const [chartTickets, setChartTickets] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
+  const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isChartLoading, setIsChartLoading] = useState(true);
+  const [isReportsLoading, setIsReportsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 10;
 
-  // Filtry do sekcji biletów
+  // Ticket filters
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sortPriority, setSortPriority] = useState('');
@@ -618,19 +668,31 @@ export default function CoordinatorPanel() {
         }
 
         const res = await api.get(`tickets/?${params.toString()}`);
-        setTickets(res.data.results || []);
+        const mainTickets = (res.data.results || []).filter(ticket => ticket.parent_ticket === null);
+        setTickets(mainTickets);
         setTotalCount(res.data.count || 0);
     } catch (err) {
         console.error("Błąd podczas pobierania danych:", err);
     } finally {
         setIsLoading(false);
     }
-      }, [currentPage, dateFrom, dateTo, priorityFilter, sortPriority, statusFilter]);
+  }, [currentPage, dateFrom, dateTo, priorityFilter, sortPriority, statusFilter]);
 
   const fetchChartTickets = useCallback(async () => {
     setIsChartLoading(true);
     try {
-      const params = createBaseTicketParams({ statusFilter, priorityFilter, dateFrom, dateTo });
+      const baseDate = new Date();
+      const endDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + chartShiftMonths, 1);
+      const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 5, 1);
+
+      const startStr = getFirstDayOfMonth(startDate.getFullYear(), startDate.getMonth() + 1);
+      const endStr = getLastDayOfMonth(endDate.getFullYear(), endDate.getMonth() + 1);
+
+      const params = new URLSearchParams();
+      if (statusFilter) params.append('status', statusFilter);
+      if (priorityFilter) params.append('priority', priorityFilter);
+      params.append('date_from', startStr);
+      params.append('date_to', endStr);
       params.set('limit', '1000');
       params.set('offset', '0');
       params.set('ordering', '-created_at');
@@ -645,7 +707,11 @@ export default function CoordinatorPanel() {
         const allResults = [...results];
 
         for (let pageIndex = 1; pageIndex < totalPages; pageIndex += 1) {
-          const pageParams = createBaseTicketParams({ statusFilter, priorityFilter, dateFrom, dateTo });
+          const pageParams = new URLSearchParams();
+          if (statusFilter) pageParams.append('status', statusFilter);
+          if (priorityFilter) pageParams.append('priority', priorityFilter);
+          pageParams.append('date_from', startStr);
+          pageParams.append('date_to', endStr);
           pageParams.set('limit', String(pageSizeForCharts));
           pageParams.set('offset', String(pageIndex * pageSizeForCharts));
           pageParams.set('ordering', '-created_at');
@@ -665,7 +731,7 @@ export default function CoordinatorPanel() {
     } finally {
       setIsChartLoading(false);
     }
-  }, [dateFrom, dateTo, priorityFilter, statusFilter]);
+  }, [chartShiftMonths, priorityFilter, statusFilter]);
 
   useEffect(() => {
       fetchTickets();
@@ -687,24 +753,68 @@ export default function CoordinatorPanel() {
       fetchCoordinators();
   }, []);
 
+  useEffect(() => {
+    const fetchReports = async () => {
+      setIsReportsLoading(true);
+      try {
+        const res = await api.get('reports/weekly/');
+        setReports(Array.isArray(res.data) ? res.data : (res.data.results || []));
+      } catch (err) {
+        console.error('Błąd pobierania raportów:', err);
+      } finally {
+        setIsReportsLoading(false);
+      }
+    };
+    fetchReports();
+  }, []);
+
   const handleTicketUpdated = () => {
       // Refresh the entire list from server to ensure sorting/pagination/filtering is consistent
       fetchTickets();
       fetchChartTickets();
   };
 
+  const handleBarClick = (bar) => {
+    if (!bar.key) return;
+    const [yearStr, monthStr] = bar.key.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+
+    const targetFirstDay = getFirstDayOfMonth(year, month);
+    const targetLastDay = getLastDayOfMonth(year, month);
+
+    if (dateFrom === targetFirstDay && dateTo === targetLastDay) {
+      setDateFrom('');
+      setDateTo('');
+    } else {
+      setDateFrom(targetFirstDay);
+      setDateTo(targetLastDay);
+    }
+    setCurrentPage(1);
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
-  const visibleReports = REPORTS_LIST.filter((report) => {
-    if (dateFrom && report.generatedOn < dateFrom) return false;
-    if (dateTo && report.generatedOn > dateTo) return false;
+  // Filter reports by the active date range (week_start / week_end overlap)
+  const visibleReports = reports.filter((report) => {
+    if (dateFrom && report.week_end < dateFrom) return false;
+    if (dateTo && report.week_start > dateTo) return false;
     return true;
   });
-  const trendData = buildTrendData(chartTickets, dateTo ? new Date(`${dateTo}T00:00:00`) : new Date());
-  const categoryData = buildCategoryDist(chartTickets);
+
+  const baseChartEndDate = new Date();
+  const shiftedEndDate = new Date(baseChartEndDate.getFullYear(), baseChartEndDate.getMonth() + chartShiftMonths, 1);
+  const trendData = buildTrendData(chartTickets, dateFrom, dateTo, shiftedEndDate);
+  // Filter category distribution client-side based on active dateFrom/dateTo range
+  const activeTickets = chartTickets.filter((ticket) => {
+    if (!ticket.created_at) return false;
+    const tDate = ticket.created_at.slice(0, 10); // Format YYYY-MM-DD
+    return (!dateFrom || tDate >= dateFrom) && (!dateTo || tDate <= dateTo);
+  });
+  const categoryData = buildCategoryDist(activeTickets);
 
   return (
     <main className="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-10 scrollbar-thin">
-      {/* ── Page header ── */}
+      {/* Page header */}
       <header className="mb-4 md:mb-6">
         <div className="mb-4 md:mb-5">
           <h1 className="text-[24px] md:text-[30px] font-bold tracking-[-0.015em] text-on-surface leading-tight">
@@ -729,14 +839,11 @@ export default function CoordinatorPanel() {
                 value={dateFrom}
                 max={dateTo || undefined}
                 onChange={(e) => {
-                  const nextDateFrom = e.target.value;
-                  setDateFrom(nextDateFrom);
-                  if (dateTo && nextDateFrom && nextDateFrom > dateTo) {
-                    setDateTo(nextDateFrom);
-                  }
+                  setDateFrom(e.target.value);
+                  setChartShiftMonths(0); // Reset shift on manual date change
                   setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
+               className="w-full px-3 py-2.5 rounded-lg bg-surface border borl px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
               />
             </div>
             <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
@@ -748,11 +855,8 @@ export default function CoordinatorPanel() {
                 value={dateTo}
                 min={dateFrom || undefined}
                 onChange={(e) => {
-                  const nextDateTo = e.target.value;
-                  setDateTo(nextDateTo);
-                  if (dateFrom && nextDateTo && nextDateTo < dateFrom) {
-                    setDateFrom(nextDateTo);
-                  }
+                  setDateTo(e.target.value);
+                  setChartShiftMonths(0); // Reset shift on manual date change
                   setCurrentPage(1);
                 }}
                 className="w-full px-3 py-2.5 rounded-lg bg-surface border border-outline-variant text-on-surface font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
@@ -761,8 +865,10 @@ export default function CoordinatorPanel() {
             <div className="flex items-end">
               <button
                 onClick={() => {
+                  // Clears filters and resets view range to all months
                   setDateFrom('');
                   setDateTo('');
+                  setChartShiftMonths(0);
                   setCurrentPage(1);
                 }}
                 className="px-4 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-error hover:bg-error-container transition-colors whitespace-nowrap"
@@ -775,21 +881,50 @@ export default function CoordinatorPanel() {
       </header>
 
       <div className="flex flex-col gap-8">
-        {/* ── Visualization bento ── */}
+        {/* Visualization bento */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Trend chart (2/3 width) */}
-          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[22rem] sm:min-h-[26rem]">
+          <div className="lg:col-span-2 bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[26rem] sm:min-h-[32rem] relative">
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface leading-tight">
                 Trend Zgłoszeń (Ostatnie 6 miesięcy)
               </h2>
             </div>
-            {isChartLoading ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
-                Ładowanie wykresu...
+            {/* loading indicator in the top right corner */}
+            {isChartLoading && trendData.length > 0 && (
+              <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-surface-container/80 backdrop-blur-sm px-2.5 py-1 rounded-full border border-outline text-[11px] font-bold text-on-surface-variant animate-pulse shadow-sm">
+                <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                Loading...
+              </div>
+            )}
+            {isChartLoading && trendData.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant animate-pulse gap-2">
+                <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                Loading chart...
               </div>
             ) : trendData.length > 0 ? (
-              <BarChart data={trendData} />
+              // smooth fading while loading (trend data)
+              <div className={`relative flex-1 flex flex-col px-4 transition-all duration-300 ${isChartLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                <button
+                  onClick={() => setChartShiftMonths(prev => prev - 1)}
+                  disabled={isChartLoading}
+                  className="absolute left-[-16px] sm:left-[-20px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  title="Poprzedni miesiąc"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                </button>
+
+                <BarChart data={trendData} onBarClick={handleBarClick} />
+
+                <button
+                  onClick={() => setChartShiftMonths(prev => prev + 1)}
+                  disabled={isChartLoading}
+                  className="absolute right-[-16px] sm:right-[-20px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  title="Następny miesiąc"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
                 Brak danych do wyświetlenia.
@@ -798,16 +933,19 @@ export default function CoordinatorPanel() {
           </div>
 
           {/* Category distribution (1/3 width) */}
-          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[22rem] sm:min-h-[26rem]">
+          <div className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 flex flex-col min-h-[18rem] lg:min-h-[32rem] relative">
             <h2 className="text-lg sm:text-[20px] font-semibold text-on-surface mb-4 sm:mb-6 leading-tight">
               Dystrybucja Kategorii
             </h2>
-            {isChartLoading ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
-                Ładowanie wykresu...
+
+            {isChartLoading && categoryData.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant animate-pulse gap-2">
+                <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                Loading...
               </div>
             ) : categoryData.length > 0 ? (
-              <div className="flex-1 flex flex-col justify-center gap-4">
+              // smooth fading while loading (category dist)
+              <div className={`flex-1 flex flex-col justify-center gap-4 transition-all duration-300 ${isChartLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                 {categoryData.slice().reverse().map((cat) => (
                   <CategoryRow key={cat.label} {...cat} />
                 ))}
@@ -816,8 +954,11 @@ export default function CoordinatorPanel() {
                   {categoryData.map((cat) => (
                     <div
                       key={cat.label}
-                      className={`h-full ${cat.color}`}
-                      style={{ width: `${cat.pct}%` }}
+                      className="h-full"
+                      style={{
+                        width: `${cat.pct}%`,
+                        backgroundColor: cat.color
+                      }}
                     />
                   ))}
                 </div>
@@ -829,8 +970,7 @@ export default function CoordinatorPanel() {
             )}
           </div>
         </section>
-
-        {/* ── Reports list ── */}
+        {/* Reports list */}
         <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 lg:p-8">
           {/* Section header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline-variant pb-4 sm:pb-5 mb-4 sm:mb-6">
@@ -838,28 +978,32 @@ export default function CoordinatorPanel() {
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
                 <span className="material-symbols-outlined">summarize</span>
               </div>
-              <h2 className="text-xl sm:text-[24px] font-bold text-on-surface leading-tight">Raporty</h2>
+              <h2 className="text-xl sm:text-[24px] font-bold text-on-surface leading-tight">Raporty tygodniowe</h2>
             </div>
+            <p className="text-sm text-on-surface-variant">
+              Raporty generowane automatycznie co tydzień przez Celery Beat.
+            </p>
           </div>
-
           {/* Report items */}
           <div className="flex flex-col gap-3">
-            {visibleReports.map((report) => (
-              <ReportRow
-                key={report.id}
-                report={report}
-              />
-            ))}
-            {visibleReports.length === 0 && (
+            {isReportsLoading ? (
+              <div className="text-center py-12 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed animate-pulse">
+                Ładowanie raportów...
+              </div>
+            ) : visibleReports.length > 0 ? (
+              visibleReports.map((report) => (
+                <ReportRow key={report.id} report={report} />
+              ))
+            ) : (
               <div className="text-center py-12 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed">
-                Brak raportów w wybranym zakresie dat.
+                {reports.length === 0
+                  ? 'Brak wygenerowanych raportów. Raporty są tworzone automatycznie co tydzień.'
+                  : 'Brak raportów w wybranym zakresie dat.'}
               </div>
             )}
           </div>
-
         </section>
-
-        {/* ── Tickets list ── */}
+        {/* Tickets list */}
         <section className="bg-surface rounded-xl shadow-soft outline outline-1 outline-outline p-4 sm:p-6 lg:p-8">
           {/* Section header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline-variant pb-4 sm:pb-5 mb-4 sm:mb-6">
@@ -871,12 +1015,12 @@ export default function CoordinatorPanel() {
             </div>
 
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              <select 
-                value={statusFilter} 
+              <select
+                value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
-                }} 
+                }}
                 className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Status: Wszystkie</option>
@@ -885,12 +1029,12 @@ export default function CoordinatorPanel() {
                 <option value="RESOLVED">Rozwiązane</option>
                 <option value="CLOSED">Zamknięte</option>
               </select>
-              <select 
-                value={priorityFilter} 
+              <select
+                value={priorityFilter}
                 onChange={(e) => {
                   setPriorityFilter(e.target.value);
                   setCurrentPage(1);
-                }} 
+                }}
                 className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Priorytet: Wszystkie</option>
@@ -899,12 +1043,12 @@ export default function CoordinatorPanel() {
                 <option value="HIGH">Wysokie</option>
                 <option value="CRITICAL">Krytyczne</option>
               </select>
-              <select 
-                value={sortPriority} 
+              <select
+                value={sortPriority}
                 onChange={(e) => {
                   setSortPriority(e.target.value);
                   setCurrentPage(1);
-                }} 
+                }}
                 className="w-full sm:w-auto px-3 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface-variant bg-surface-container-low outline-none cursor-pointer hover:border-primary/40"
               >
                 <option value="">Sortuj: Domyślnie</option>
@@ -925,22 +1069,22 @@ export default function CoordinatorPanel() {
                 {tickets.map((ticket) => (
                   <TicketRow key={ticket.id} ticket={ticket} coordinators={coordinators} onTicketUpdated={handleTicketUpdated} />
                 ))}
-                
-                {/* ── Pagination Footer ── */}
+
+                {/* Pagination Footer */}
                 <div className="mt-8 pt-6 border-t border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-4">
                   <p className="text-sm text-on-surface-variant">
                     Pokazano <span className="font-bold text-on-surface">{Math.min(totalCount, (currentPage - 1) * pageSize + 1)} - {Math.min(totalCount, currentPage * pageSize)}</span> z <span className="font-bold text-on-surface">{totalCount}</span> zgłoszeń
                   </p>
-                  
+
                   <div className="flex items-center gap-1">
-                    <button 
+                    <button
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1 || isLoading}
                       className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline hover:bg-surface-container transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
                     >
                       <span className="material-symbols-outlined">chevron_left</span>
                     </button>
-                    
+
                     {[...Array(totalPages)].map((_, i) => {
                         const pageNum = i + 1;
                         // Simple logic to show only some pages if too many
@@ -948,7 +1092,6 @@ export default function CoordinatorPanel() {
                             if (pageNum === 3 || pageNum === totalPages - 2) return <span key={pageNum} className="px-2">...</span>;
                             return null;
                         }
-                        
                         return (
                           <button
                             key={pageNum}
@@ -963,8 +1106,7 @@ export default function CoordinatorPanel() {
                           </button>
                         );
                     })}
-                    
-                    <button 
+                    <button
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages || totalPages === 0 || isLoading}
                       className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline hover:bg-surface-container transition-colors disabled:opacity-30 disabled:hover:bg-transparent"

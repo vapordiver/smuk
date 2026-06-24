@@ -574,6 +574,7 @@ class WeeklyReportListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsInCoordinatorGroup]
 
 
+
 class StatsViewSet(viewsets.ViewSet):
     """
     ViewSet for dashboard and personal stats.

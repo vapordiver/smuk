@@ -3,27 +3,36 @@
         "model": "tickets.faultcategory",
         "pk": 1,
         "fields": {
-            "name": "Instalacja wodna",
-            "icon": "💧",
-            "color": "#2196F3"
+            "name": "Zieleń i trawniki",
+            "icon": "🌳",
+            "color": "#84CC16"
         }
     },
     {
         "model": "tickets.faultcategory",
         "pk": 2,
         "fields": {
-            "name": "Elektryka",
-            "icon": "⚡",
-            "color": "#FFEB3B"
+            "name": "Oświetlenie i elektryka",
+            "icon": "💡",
+            "color": "#FBBF24"
         }
     },
     {
         "model": "tickets.faultcategory",
         "pk": 3,
         "fields": {
-            "name": "Ogrzewanie",
-            "icon": "🔥",
-            "color": "#FF5722"
+            "name": "Nawierzchnia i drogi",
+            "icon": "🛣️",
+            "color": "#94A3B8"
+        }
+    },
+    {
+        "model": "tickets.faultcategory",
+        "pk": 4,
+        "fields": {
+            "name": "Mała architektura i ogrodzenia",
+            "icon": "🚧",
+            "color": "#8B5CF6"
         }
     }
 ]
