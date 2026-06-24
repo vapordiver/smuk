@@ -681,7 +681,7 @@ export default function CoordinatorPanel() {
   const fetchChartTickets = useCallback(async () => {
     setIsChartLoading(true);
     try {
-      const baseDate = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date();
+      const baseDate = new Date();
       const endDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + chartShiftMonths, 1);
       const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 5, 1);
 
@@ -731,7 +731,7 @@ export default function CoordinatorPanel() {
     } finally {
       setIsChartLoading(false);
     }
-  }, [chartShiftMonths, dateTo, priorityFilter, statusFilter]);
+  }, [chartShiftMonths, priorityFilter, statusFilter]);
 
   useEffect(() => {
       fetchTickets();
@@ -790,7 +790,6 @@ export default function CoordinatorPanel() {
       setDateFrom(targetFirstDay);
       setDateTo(targetLastDay);
     }
-    setChartShiftMonths(0);
     setCurrentPage(1);
   };
 
@@ -802,7 +801,7 @@ export default function CoordinatorPanel() {
     return true;
   });
 
-  const baseChartEndDate = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date();
+  const baseChartEndDate = new Date();
   const shiftedEndDate = new Date(baseChartEndDate.getFullYear(), baseChartEndDate.getMonth() + chartShiftMonths, 1);
   const trendData = buildTrendData(chartTickets, dateFrom, dateTo, shiftedEndDate);
   // Filter category distribution client-side based on active dateFrom/dateTo range
@@ -909,7 +908,7 @@ export default function CoordinatorPanel() {
                 <button
                   onClick={() => setChartShiftMonths(prev => prev - 1)}
                   disabled={isChartLoading}
-                  className="absolute left-[-12px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  className="absolute left-[-16px] sm:left-[-20px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                   title="Poprzedni miesiąc"
                 >
                   <span className="material-symbols-outlined text-[18px]">chevron_left</span>
@@ -920,7 +919,7 @@ export default function CoordinatorPanel() {
                 <button
                   onClick={() => setChartShiftMonths(prev => prev + 1)}
                   disabled={isChartLoading}
-                  className="absolute right-[-12px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  className="absolute right-[-16px] sm:right-[-20px] top-[40%] -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-surface shadow border border-outline flex items-center justify-center text-on-surface hover:bg-surface-container transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                   title="Następny miesiąc"
                 >
                   <span className="material-symbols-outlined text-[18px]">chevron_right</span>
