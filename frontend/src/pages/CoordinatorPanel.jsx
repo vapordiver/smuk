@@ -36,27 +36,10 @@ const getLastDayOfMonth = (year, month) => {
 
 const MONTH_LABELS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
-//mockup - delete later
-const REPORTS_LIST = [
-  {
-    id: 1,
-    icon: 'picture_as_pdf',
-    iconColor: 'text-primary-fixed-dim',
-    title: 'Raport Miesięczny - Luty 2024',
-    description: 'Wszystkie kategorie, Wszystkie statusy',
-    generatedAt: 'Dzisiaj, 09:41',
-    generatedOn: '2024-02-15',
-  },
-  {
-    id: 2,
-    icon: 'analytics',
-    iconColor: 'text-secondary',
-    title: 'Usterki IT - Semestr Zimowy',
-    description: 'Infrastruktura IT, Tylko zakończone',
-    generatedAt: 'Wczoraj, 14:20',
-    generatedOn: '2024-01-18',
-  },
-];
+const formatReportDate = (isoDateStr) => {
+  if (!isoDateStr) return '—';
+  return new Date(isoDateStr).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 const STATUS_MAP = {
   NEW: { label: 'Nowe', color: 'bg-primary/10 text-primary' },
@@ -294,53 +277,82 @@ function CategoryRow({ label, pct, color }) {
   );
 }
 
-function ReportRow({ report, dateFrom, dateTo }) {
+function ReportRow({ report }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const stats = report.raw_stats || {};
+  const weekLabel = `${formatReportDate(report.week_start)} – ${formatReportDate(report.week_end)}`;
+  const generatedAt = report.created_at
+    ? new Date(report.created_at).toLocaleString('pl-PL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '—';
+
   return (
-    <div className="bg-surface rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 outline outline-1 outline-outline hover:shadow-sm transition-shadow group">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center shrink-0">
-          <span
-            className={`material-symbols-outlined ${report.iconColor}`}
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            {report.icon}
-          </span>
-        </div>
-        <div>
-          <h3 className="font-bold text-on-surface">{report.title}</h3>
-          <div className="flex items-center gap-2 text-sm text-on-surface-variant mt-1 flex-wrap">
-            <span className="material-symbols-outlined text-[16px]">schedule</span>
-            <span>{report.generatedAt}</span>
-            <span className="mx-1">•</span>
-            <span>{report.description}</span>
-            {(dateFrom || dateTo) && (
-              <>
-                <span className="mx-1">•</span>
-                <span className="text-primary font-medium">
-                  {dateFrom || '…'} – {dateTo || '…'}
-                </span>
-              </>
-            )}
+    <div className="bg-surface rounded-xl flex flex-col outline outline-1 outline-outline hover:shadow-sm transition-shadow">
+      <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <span
+              className="material-symbols-outlined text-primary"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              analytics
+            </span>
           </div>
+          <div className="min-w-0">
+            <h3 className="font-bold text-on-surface">
+              Raport tygodniowy: {weekLabel}
+            </h3>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-on-surface-variant mt-1">
+              <span className="material-symbols-outlined text-[15px]">schedule</span>
+              <span>Wygenerowano: {generatedAt}</span>
+              {stats.total_created != null && (
+                <>
+                  <span className="mx-0.5">•</span>
+                  <span>{stats.total_created} nowych</span>
+                </>
+              )}
+              {stats.total_resolved != null && (
+                <>
+                  <span className="mx-0.5">•</span>
+                  <span>{stats.total_resolved} rozwiązanych</span>
+                </>
+              )}
+              {stats.total_open != null && (
+                <>
+                  <span className="mx-0.5">•</span>
+                  <span>{stats.total_open} otwartych</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          {report.content && (
+            <button
+              className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
+              title={expanded ? 'Zwiń szczegóły' : 'Rozwiń podsumowanie AI'}
+              onClick={() => setExpanded(v => !v)}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {expanded ? 'expand_less' : 'smart_toy'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-        <button
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low text-on-surface font-semibold text-sm hover:bg-outline-variant/50 transition-colors"
-          title="Pobierz PDF"
-        >
-          <span className="material-symbols-outlined text-[18px]">download</span>
-          PDF
-        </button>
-        <button
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low text-on-surface font-semibold text-sm hover:bg-outline-variant/50 transition-colors"
-          title="Pobierz CSV"
-        >
-          <span className="material-symbols-outlined text-[18px]">csv</span>
-          CSV
-        </button>
-      </div>
+      {expanded && report.content && (
+        <div className="px-4 pb-4 pt-0 border-t border-outline-variant">
+          <div className="mt-3 p-3 bg-surface-container-low rounded-xl text-sm text-on-surface leading-relaxed whitespace-pre-wrap">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+              <span className="material-symbols-outlined text-[14px]">smart_toy</span>
+              Podsumowanie AI
+            </div>
+            {report.content}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -628,8 +640,10 @@ export default function CoordinatorPanel() {
   const [tickets, setTickets] = useState([]);
   const [chartTickets, setChartTickets] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
+  const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isChartLoading, setIsChartLoading] = useState(true);
+  const [isReportsLoading, setIsReportsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 10;
@@ -739,6 +753,21 @@ export default function CoordinatorPanel() {
       fetchCoordinators();
   }, []);
 
+  useEffect(() => {
+    const fetchReports = async () => {
+      setIsReportsLoading(true);
+      try {
+        const res = await api.get('reports/weekly/');
+        setReports(Array.isArray(res.data) ? res.data : (res.data.results || []));
+      } catch (err) {
+        console.error('Błąd pobierania raportów:', err);
+      } finally {
+        setIsReportsLoading(false);
+      }
+    };
+    fetchReports();
+  }, []);
+
   const handleTicketUpdated = () => {
       // Refresh the entire list from server to ensure sorting/pagination/filtering is consistent
       fetchTickets();
@@ -766,9 +795,10 @@ export default function CoordinatorPanel() {
   };
 
   const totalPages = Math.ceil(totalCount / pageSize);
-  const visibleReports = REPORTS_LIST.filter((report) => {
-    if (dateFrom && report.generatedOn < dateFrom) return false;
-    if (dateTo && report.generatedOn > dateTo) return false;
+  // Filter reports by the active date range (week_start / week_end overlap)
+  const visibleReports = reports.filter((report) => {
+    if (dateFrom && report.week_end < dateFrom) return false;
+    if (dateTo && report.week_start > dateTo) return false;
     return true;
   });
 
@@ -949,20 +979,27 @@ export default function CoordinatorPanel() {
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary">
                 <span className="material-symbols-outlined">summarize</span>
               </div>
-              <h2 className="text-xl sm:text-[24px] font-bold text-on-surface leading-tight">Raporty</h2>
+              <h2 className="text-xl sm:text-[24px] font-bold text-on-surface leading-tight">Raporty tygodniowe</h2>
             </div>
+            <p className="text-sm text-on-surface-variant">
+              Raporty generowane automatycznie co tydzień przez Celery Beat.
+            </p>
           </div>
           {/* Report items */}
           <div className="flex flex-col gap-3">
-            {visibleReports.map((report) => (
-              <ReportRow
-                key={report.id}
-                report={report}
-              />
-            ))}
-            {visibleReports.length === 0 && (
+            {isReportsLoading ? (
+              <div className="text-center py-12 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed animate-pulse">
+                Ładowanie raportów...
+              </div>
+            ) : visibleReports.length > 0 ? (
+              visibleReports.map((report) => (
+                <ReportRow key={report.id} report={report} />
+              ))
+            ) : (
               <div className="text-center py-12 text-on-surface-variant bg-surface-container-low rounded-xl border border-outline border-dashed">
-                Brak raportów w wybranym zakresie dat.
+                {reports.length === 0
+                  ? 'Brak wygenerowanych raportów. Raporty są tworzone automatycznie co tydzień.'
+                  : 'Brak raportów w wybranym zakresie dat.'}
               </div>
             )}
           </div>
