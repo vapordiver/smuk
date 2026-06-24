@@ -445,7 +445,7 @@ function TicketRow({ ticket, coordinators, onTicketUpdated }) {
 
     return {
        title: `Zmieniono ${name}`,
-       content: <>z <span className="line-through">{formatVal(log.old_value, log.field_changed)}</span> na <span className="font-bold text-primary">{formatVal(log.new_value, log.field_changed)}</span></>
+       content: <>z <strong className="line-through font-bold">{formatVal(log.old_value, log.field_changed)}</strong> na <strong className="font-bold text-primary">{formatVal(log.new_value, log.field_changed)}</strong></>
     };
   };
 

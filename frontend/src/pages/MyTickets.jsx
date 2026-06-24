@@ -100,25 +100,25 @@ const getAuditFieldLabel = (fieldChanged) => {
 const getAuditChangeText = (entry) => {
     if (entry.field_changed === 'assigned_to') {
         if (!entry.old_value && entry.new_value) {
-            return `na ${entry.new_value}`;
+             return <>na <strong className="font-bold text-slate-800">{entry.new_value}</strong></>;
         }
 
         if (entry.old_value && entry.new_value) {
-            return `z ${entry.old_value} na ${entry.new_value}`;
+            return <>z <span className="line-through text-slate-400">{entry.old_value}</span> na <strong className="font-bold text-slate-800">{entry.new_value}</strong></>;
         }
 
         if (entry.old_value && !entry.new_value) {
-            return `z ${entry.old_value} na brak przypisania`;
+            return <>z <span className="line-through text-slate-400">{entry.old_value}</span> na <strong className="font-bold text-slate-800">brak przypisania</strong></>;
         }
     }
 
     if (entry.field_changed === 'status' || entry.field_changed === 'priority') {
         const oldValue = mapAuditValueToPolish(entry.field_changed, entry.old_value) || 'brak';
         const newValue = mapAuditValueToPolish(entry.field_changed, entry.new_value) || 'brak';
-        return `z ${oldValue} na ${newValue}`;
+        return <>z <strong className="line-through font-bold text-slate-400">{oldValue}</strong> na <strong className="font-bold text-slate-800">{newValue}</strong></>;;
     }
 
-    return `z ${entry.old_value || 'brak'} na ${entry.new_value || 'brak'}`;
+    return <>z <span className="line-through text-slate-400">{entry.old_value || 'brak'}</span> na <strong className="font-bold text-slate-800">{entry.new_value || 'brak'}</strong></>;
 };
 
 //ticket card display
