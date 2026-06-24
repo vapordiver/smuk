@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import '../utils/leafletSetup';
@@ -18,6 +18,20 @@ import useCategories from '../hooks/useCategories';
 const CAMPUS_CENTER = [51.7500, 19.4520];
 const DEFAULT_ZOOM = 15;
 const SVG_RENDERER = L.svg({ padding: 1.0 });
+
+function MapResizeListener() {
+    const map = useMap();
+    useEffect(() => {
+        map.invalidateSize();
+        const timer1 = setTimeout(() => map.invalidateSize(), 100);
+        const timer2 = setTimeout(() => map.invalidateSize(), 500);
+        return () => {
+            clearTimeout(timer1);
+            clearTimeout(timer2);
+        };
+    }, [map]);
+    return null;
+}
 
 export default function CampusMap() {
     const [viewMode, setViewMode] = useState('markers'); // 'markers' | 'heatmap'
@@ -52,6 +66,7 @@ export default function CampusMap() {
                 scrollWheelZoom={true}
                 tap={false}
             >
+                <MapResizeListener />
                 <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     maxZoom={22}
