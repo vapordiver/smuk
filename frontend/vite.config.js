@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   //proxy for /api to backend
   server: {
-    allowedHosts: ['.ngrok-free.dev'],
+    allowedHosts: true,
     //thanks to michal wisniewski now frontend hot reload works (God bless him)
     watch: {
       usePolling: true,
@@ -57,12 +57,12 @@ export default defineConfig({
           }
         ]
       },
-      injectManifest:{
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}']
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}']
       },
       devOptions: {
         enabled: true,
-          type: 'module'
+        type: 'module'
       }
     })
   ],

@@ -377,21 +377,32 @@ export default function MyTickets() {
             try {
                 let allResults = [];
                 let currentUrl = endpoint;
+                console.log('[MyTickets] Starting fetch, endpoint:', endpoint);
                 while (currentUrl) {
+                    console.log('[MyTickets] Fetching:', currentUrl);
                     const res = await api.get(currentUrl);
+                    console.log('[MyTickets] Response:', res.status, 'data:', JSON.stringify(res.data).slice(0, 500));
                     allResults = [...allResults, ...(res.data.results || [])];
                     let nextUrl = res.data.next;
-                    if (nextUrl && nextUrl.includes('backend:8000')) {
-                        nextUrl = nextUrl.replace('backend:8000', 'localhost:8000');
+                    if (nextUrl) {
+                        try {
+                            const parsed = new URL(nextUrl);
+                            // Strip /api/ prefix since axios baseURL already includes it
+                            nextUrl = parsed.pathname.replace(/^\/api\//, '') + parsed.search;
+                        } catch {
+                            // already relative, use as-is
+                        }
                     }
+                    console.log('[MyTickets] nextUrl:', nextUrl, 'allResults count:', allResults.length);
                     currentUrl = nextUrl;
                 }
+                console.log('[MyTickets] Fetch complete, total tickets:', allResults.length);
                 if (isMounted) {
                     setTickets(allResults);
                     setIsLoading(false);
                 }
             } catch (err) {
-                console.error("Błąd pobierania zgłoszeń: ", err);
+                console.error("[MyTickets] FETCH ERROR:", err, err?.response?.status, err?.response?.data);
                 if (isMounted) {
                     setIsLoading(false);
                 }
