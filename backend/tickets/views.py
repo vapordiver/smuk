@@ -1,3 +1,5 @@
+import csv
+import io
 import logging
 
 from django.contrib.gis.db.models.functions import Distance, SnapToGrid
@@ -572,6 +574,82 @@ class WeeklyReportListView(generics.ListAPIView):
     queryset = WeeklyReport.objects.all()
     serializer_class = WeeklyReportSerializer
     permission_classes = [IsAuthenticated, IsInCoordinatorGroup]
+
+
+class WeeklyReportExportView(generics.GenericAPIView):
+    """
+    GET /api/reports/weekly/<id>/export/?format=csv|txt
+    Exports a single weekly report as CSV (raw_stats) or plain text (AI content).
+    Requires coordinator role.
+    """
+    permission_classes = [IsAuthenticated, IsInCoordinatorGroup]
+    queryset = WeeklyReport.objects.all()
+
+    def get(self, request, pk=None):
+        from django.http import HttpResponse
+
+        try:
+            report = WeeklyReport.objects.get(pk=pk)
+        except WeeklyReport.DoesNotExist:
+            return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        export_format = request.query_params.get('format', 'csv').lower()
+        week_start = report.week_start.date().isoformat()
+        week_end = report.week_end.date().isoformat()
+        filename_base = f"raport_{week_start}_{week_end}"
+
+        if export_format == 'txt':
+            content_text = report.content or ''
+            if not content_text:
+                # Fall back to raw_stats summary when AI content is absent
+                stats = report.raw_stats or {}
+                lines = [
+                    f"Raport tygodniowy: {week_start} – {week_end}",
+                    "",
+                    f"Nowe zgłoszenia: {stats.get('total_created', 'N/A')}",
+                    f"Rozwiązane zgłoszenia: {stats.get('total_resolved', 'N/A')}",
+                    f"Otwarte zgłoszenia: {stats.get('total_open', 'N/A')}",
+                ]
+                top_cat = stats.get('top_category')
+                if top_cat:
+                    lines.append(f"Najczęstsza kategoria: {top_cat['name']} ({top_cat['count']} zgłoszeń)")
+                top_bld = stats.get('top_building')
+                if top_bld:
+                    lines.append(f"Budynek z najwyższą liczbą zgłoszeń: {top_bld['name']} ({top_bld['count']} zgłoszeń)")
+                content_text = '\n'.join(lines)
+
+            response = HttpResponse(content_text, content_type='text/plain; charset=utf-8')
+            response['Content-Disposition'] = f'attachment; filename="{filename_base}.txt"'
+            return response
+
+        # Default: CSV
+        stats = report.raw_stats or {}
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow(['Raport tygodniowy', f'{week_start} – {week_end}'])
+        writer.writerow([])
+        writer.writerow(['Metryka', 'Wartość'])
+        writer.writerow(['Nowe zgłoszenia', stats.get('total_created', '')])
+        writer.writerow(['Rozwiązane zgłoszenia', stats.get('total_resolved', '')])
+        writer.writerow(['Otwarte zgłoszenia', stats.get('total_open', '')])
+
+        top_cat = stats.get('top_category')
+        if top_cat:
+            writer.writerow(['Najczęstsza kategoria', f"{top_cat['name']} ({top_cat['count']})"])
+
+        top_bld = stats.get('top_building')
+        if top_bld:
+            writer.writerow(['Budynek z największą liczbą zgłoszeń', f"{top_bld['name']} ({top_bld['count']})"])
+
+        if report.content:
+            writer.writerow([])
+            writer.writerow(['Podsumowanie AI', report.content])
+
+        csv_content = output.getvalue()
+        response = HttpResponse(csv_content, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{filename_base}.csv"'
+        return response
 
 
 class StatsViewSet(viewsets.ViewSet):
