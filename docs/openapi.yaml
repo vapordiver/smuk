@@ -158,13 +158,13 @@ components:
           type: integer
         name:
           type: string
-          example: Instalacja wodna
+          example: Zieleń i trawniki
         icon:
           type: string
-          example: "💧"
+          example: "🌳"
         color:
           type: string
-          example: "#2196F3"
+          example: "#10B981"
 
     # --- Budynek ---
     Building:
@@ -1363,19 +1363,10 @@ paths:
                 items:
                   $ref: "#/components/schemas/Category"
               example:
-                - { id: 1, name: "Elektryczność", icon: "⚡", color: "#FFC107" }
-                - {
-                    id: 2,
-                    name: "Ogrzewanie / Wentylacja",
-                    icon: "🌡️",
-                    color: "#FF5722",
-                  }
-                - {
-                    id: 3,
-                    name: "Instalacja wodna",
-                    icon: "💧",
-                    color: "#2196F3",
-                  }
+                - { id: 1, name: "Zieleń i trawniki", icon: "🌳", color: "#10B981" }
+                - { id: 2, name: "Oświetlenie i elektryka", icon: "💡", color: "#E0B000" }
+                - { id: 3, name: "Nawierzchnia i drogi", icon: "🛣️", color: "#6B7280" }
+                - { id: 4, name: "Mała architektura i ogrodzenia", icon: "🚧", color: "#8B5CF6" }
 
   # ═══════════════════════════════════════════════════════
   # NOTIFICATIONS

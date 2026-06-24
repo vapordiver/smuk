@@ -157,10 +157,10 @@ const buildCategoryDist = (tickets) => {
     return inneCount > 0 ? [{ label: 'Inne', pct: 100, color: '#94a3b8' }] : [];
   }
 
-  const top3 = sortedByCount.slice(0, 3);
-  const remainingCount = sortedByCount.slice(3).reduce((sum, [, count]) => sum + count, 0) + (counts.get('Inne') || 0);
-  const stableTop3 = top3.sort((a, b) => a[0].localeCompare(b[0]));
-  const finalEntries = [...stableTop3];
+  const top5 = sortedByCount.slice(0, 5);
+  const remainingCount = sortedByCount.slice(5).reduce((sum, [, count]) => sum + count, 0) + (counts.get('Inne') || 0);
+  const stableTop5 = top5.sort((a, b) => a[0].localeCompare(b[0]));
+  const finalEntries = [...stableTop5];
   if (remainingCount > 0) {
     finalEntries.push(['Inne', remainingCount]);
   }

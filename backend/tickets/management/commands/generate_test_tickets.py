@@ -77,22 +77,23 @@ class Command(BaseCommand):
         # B18 building fallback to A1 if missing
         building_b18 = Building.objects.filter(name__icontains='B18').first() or Building.objects.filter(name__icontains='A1').first()
 
-        category_water = FaultCategory.objects.filter(name='Instalacja wodna').first()
-        category_elec = FaultCategory.objects.filter(name='Elektryka').first()
-        category_heat = FaultCategory.objects.filter(name='Ogrzewanie').first()
+        category_green = FaultCategory.objects.filter(name='Zieleń i trawniki').first()
+        category_elec = FaultCategory.objects.filter(name='Oświetlenie i elektryka').first()
+        category_road = FaultCategory.objects.filter(name='Nawierzchnia i drogi').first()
+        category_infra = FaultCategory.objects.filter(name='Mała architektura i ogrodzenia').first()
 
         # Abort if required foreign keys are missing 
-        if not building_a10 or not building_c3 or not category_elec:
+        if not building_a10 or not building_c3 or not category_elec or not category_green or not category_road or not category_infra:
             raise CommandError(
                 "Missing Building or FaultCategory in the database! "
                 "Please create them first before running this script."
             )
 
         # 4. Create Tickets
-        # Ticket 1 (Reporter 1) - A10 Elektryka
+        # Ticket 1 (Reporter 1) - A10 Oświetlenie i elektryka
         t1 = Ticket.objects.create(
-            title="Uszkodzone gniazdko w sali komputerowej",
-            description="Jedno z gniazdek w sali 102 jest poluzowane i iskrzy przy podłączaniu zasilacza. Proszę o pilną naprawę ze względów bezpieczeństwa.",
+            title="Uszkodzona latarnia przy wejściu",
+            description="Latarnia zewnętrzna przy wejściu głównym do budynku A10 nie świeci, przez co po zmroku jest zupełnie ciemno i niebezpiecznie.",
             location=building_a10.centroid,
             building=building_a10,
             category=category_elec,
@@ -101,26 +102,26 @@ class Command(BaseCommand):
             status=Ticket.Status.NEW
         )
 
-        # Ticket 2 (Reporter 1, assigned to Coordinator) - C3 Instalacja wodna
+        # Ticket 2 (Reporter 1, assigned to Coordinator) - C3 Zieleń i trawniki
         t2 = Ticket.objects.create(
-            title="Cieknący kran w łazience na parterze",
-            description="Z kranu w męskiej toalecie cały czas kapie woda, nie da się go do końca zakręcić. Zbiera się woda na podłodze.",
+            title="Powalone drzewo blokujące przejście",
+            description="Po wczorajszej burzy duże drzewo przewróciło się na chodnik i blokuje przejście pieszych w pobliżu budynku C3.",
             location=building_c3.centroid,
             building=building_c3,
-            category=category_water,
+            category=category_green,
             reporter=reporter1,
             assigned_to=coordinator1,
             priority=Ticket.Priority.MEDIUM,
             status=Ticket.Status.IN_PROGRESS
         )
 
-        # Ticket 3 (Reporter 2) - B18 Ogrzewanie
+        # Ticket 3 (Reporter 2) - B18 Nawierzchnia i drogi
         t3 = Ticket.objects.create(
-            title="Niedziałający kaloryfer na auli",
-            description="Kaloryfer w głównej auli na końcu sali jest całkowicie zimny, mimo że zawór jest odkręcony na maksimum. W sali jest bardzo zimno.",
+            title="Głębokie uszkodzenie nawierzchni drogi",
+            description="Na drodze dojazdowej w pobliżu budynku B18 powstał głęboki ubytek w asfalcie, stwarzający zagrożenie dla pojazdów.",
             location=building_b18.centroid,
             building=building_b18,
-            category=category_heat,
+            category=category_road,
             reporter=reporter2,
             priority=Ticket.Priority.CRITICAL,
             status=Ticket.Status.NEW
