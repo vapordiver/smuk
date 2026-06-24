@@ -54,6 +54,7 @@ export default function ReportForm() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [nearbyTickets, setNearbyTickets] = useState([]);
   const [isPrechecking, setIsPrechecking] = useState(false);
+  const [isConfirmingDuplicate, setIsConfirmingDuplicate] = useState(false);
 
   /* ── Mobile Check ── */
   useEffect(() => {
@@ -102,6 +103,8 @@ export default function ReportForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (submitting || submitted || isPrechecking || showDuplicateModal || isConfirmingDuplicate) return;
+
     if (!validate()) {
       showToast('error', 'Formularz zawiera błędy. Popraw zaznaczone pola.');
       const firstErrorEl = document.querySelector('[data-field-error]');
@@ -116,7 +119,7 @@ export default function ReportForm() {
           lat: location.lat,
           lng: location.lng,
           category_id: categoryId,
-          radius: 50, // promien w metrach
+          radius: 55, // radius in meters
           building_id: buildingId || ''
         }
       });
@@ -196,6 +199,8 @@ export default function ReportForm() {
 
   /* ── Confirm Duplicate ── */
   const handleConfirmDuplicate = async (parentTicketId) => {
+    if (isConfirmingDuplicate) return;
+    setIsConfirmingDuplicate(true);
     try {
       const payload = {
         new_ticket_data: {
@@ -452,14 +457,14 @@ export default function ReportForm() {
           <div className="pt-4">
             <button
               type="submit"
-              disabled={submitting || submitted || loadingData || isPrechecking}
+              disabled={submitting || submitted || loadingData || isPrechecking || showDuplicateModal || isConfirmingDuplicate}
               className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold text-base shadow-lg shadow-primary/20
                 hover:shadow-xl hover:shadow-primary/30 hover:scale-[0.98] active:scale-95
                 transition-all duration-200 cursor-pointer
                 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-lg
                 flex items-center justify-center gap-2"
             >
-              {(submitting || isPrechecking) ? (
+              {(submitting || isPrechecking || isConfirmingDuplicate) ? (
                 <>
                   <span className="material-symbols-outlined text-xl animate-spin">progress_activity</span>
                   Przetwarzanie…
