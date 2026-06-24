@@ -8,6 +8,14 @@ import LocationPicker from '../components/report/LocationPicker';
 import Toast, { useToast } from '../components/common/Toast';
 import DuplicateModal from '../components/report/DuplicateModal';
 import api from '../services/api';
+import {savePendingTicket} from "../services/db.js";
+
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+});
 
 /**
  * ReportForm — Full responsive fault-report form (mobile-first).
@@ -140,12 +148,47 @@ export default function ReportForm() {
       formData.append('latitude', location.lat);
       formData.append('longitude', location.lng);
 
+      //standard submit try
       await submitTicket(formData);
 
       setSubmitted(true);
       showToast('success', 'Zgłoszenie zostało wysłane! Przekierowuję…');
       setTimeout(() => navigate('/my-tickets'), 2000);
     } catch (err) {
+        //if offline
+        if(!navigator.onLine || err.message === 'Network Error' || err.code === 'ERR_NETWORK'){
+            try{
+                const base64Image = await fileToBase64(image);
+                const pendingTicket = {
+                    id: Date.now().toString(), //a unique id for cache db
+                    title: title.trim(),
+                    categoryId: categoryId,
+                    buildingId: buildingId || null,
+                    description: description.trim(),
+                    latitude: location.lat,
+                    longitude: location.lng,
+                    image: base64Image,
+                    token: localStorage.getItem('accessToken')
+                };
+                await savePendingTicket(pendingTicket);
+                //background sync for android (separate try-catch, ticket is already saved above)
+                try {
+                    if('serviceWorker' in navigator && 'SyncManager' in window){
+                        const registration = await navigator.serviceWorker.ready;
+                        await registration.sync.register('sync-tickets');
+                    }
+                } catch (syncErr) {
+                    console.warn('Background sync registration failed, will sync on next online event:', syncErr);
+                }
+                setSubmitted(true);
+                showToast('success', 'Brak internetu. Zgłoszenie zapisane offline. Zostanie wysłane po odzyskaniu połączenia.');
+                setTimeout(()=> navigate('/my-tickets'),3000);
+            }catch (dbError){
+                console.error("Error while saving ticket to IndexedDB",dbError);
+                showToast('error','Nie udało się zapisać zgłoszenia w trybie offline.');
+            }
+            return;
+        }
       const locationErrors = [
         'Lokalizacja znajduje się poza granicami kampusu.',
         'Lokalizacja jest zbyt daleko od wybranego budynku (maks. 300m).',
@@ -175,6 +218,7 @@ export default function ReportForm() {
       setTimeout(() => navigate('/my-tickets'), 2000);
     } catch (err) {
       showToast('error', 'Wystąpił błąd podczas podpinania zgłoszenia.');
+      console.log('Error occurred: ',err);
     }
   };
 

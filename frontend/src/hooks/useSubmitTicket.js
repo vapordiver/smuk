@@ -45,7 +45,10 @@ export default function useSubmitTicket() {
         errorMessage = 'Brak odpowiedzi z serwera. Sprawdź połączenie z internetem.';
       }
       errorMessage = translations[errorMessage] || errorMessage;
-      throw new Error(errorMessage);
+      const wrappedError = new Error(errorMessage);
+      //preserve axios error code for offline detection in ReportForm
+      if (error.code) wrappedError.code = error.code;
+      throw wrappedError;
     } finally {
       setSubmitting(false);
     }
